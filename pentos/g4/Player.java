@@ -19,6 +19,7 @@ public class Player implements pentos.sim.Player {
     private int left_min;
     private boolean road_built;
     private Set<Cell> road_neighbors;
+    private Set<Cell> roads;
 
 	public void init() { // function is called once at the beginning before play is called
 		this.factory_level = 0;
@@ -28,22 +29,36 @@ public class Player implements pentos.sim.Player {
         this.road_neighbors = new HashSet<Cell>();
     }
 
+    public void print(Move m){
+        System.out.println("location: " + m.location.toString());
+        System.out.println("building: " + m.request.toString());
+        System.out.println("water: ");
+        for(Cell w:m.water){
+            System.out.print(w.toString());
+        }
+        System.out.println("park: ");
+        for(Cell p:m.park){
+            System.out.print(p.toString());
+        }
+    }
+
+
     public Move play(Building request, Land land) {
     	Move m = new Move(false);
-        if(road_built = false){
-            buildRoad(m,land.side);
-            road_built = true;
+        if(!road_built){
+            buildRoad(land.side);
         }
-
     	List<Cell> startCoors = getStartCoors(land,request.type == Building.Type.FACTORY);
+        //for(Cell s:startCoors) System.out.println(s.toString());
         this.left_min = Integer.MAX_VALUE;
         pickMove(startCoors,m,land,request);
-        if(m.accept) return m;
-
+        if(m.accept){
+            //System.out.println("returned here");
+            print(m);
+            return m;
+        }
     	//this level is full; build roads for next level;
         //update level information
-		Set<Cell> road_cells = new HashSet<Cell>();
-		int row = 0;	
 		if(request.type == Building.Type.FACTORY){
 			factory_level++;	
 		}
@@ -60,8 +75,8 @@ public class Player implements pentos.sim.Player {
 
 
     //build the roads based on size of land
-    private void buildRoad(Move m,int side){
-        Set<Cell> roads = new HashSet<Cell>();
+    private void buildRoad(int side){
+        roads = new HashSet<Cell>();
         int lo = 5;
         int hi = side - 6;
         while(lo<hi){
@@ -79,7 +94,6 @@ public class Player implements pentos.sim.Player {
             lo += 6;
             hi -= 6;
         }
-        m.road = roads;
     }
 
 
@@ -90,9 +104,11 @@ public class Player implements pentos.sim.Player {
         for (int ri = 0 ; ri < rotations.length ; ri++) {
             Building b = rotations[ri];
             for(Cell p:startCoors){
-                if (land.buildable(b, p) && connected(land,b,p)){
+                if (land.buildable(b, p) && connected(land,b,p) && !hitRoad(b)){
                     Set<Cell> waters = new HashSet<Cell>();
                     Set<Cell> parks = new HashSet<Cell>();
+                    //System.out.println("DFS");
+                    //System.out.println(b.toString());
                     DFS(land,b,m,p,waters,parks);
                 }
             }
@@ -111,10 +127,20 @@ public class Player implements pentos.sim.Player {
         return false;
     }
 
+    private boolean hitRoad(Building b){
+        Iterator<Cell> itr = b.iterator();
+        while(itr.hasNext()){
+            Cell c = itr.next();
+            if(roads.contains(c)) return true;
+        }
+        return false;
+    }
+
+
     //search all valid placement of 4 cell water and parks
     //find the placement that returns the smallest leftRemainingCell
     private void DFS(Land land,Building b,Move m,Cell p,Set<Cell> waters,Set<Cell> parks){
-        if(b.type == Building.Type.FACTORY){
+        if(true || b.type == Building.Type.FACTORY){
             checkOptimal(land,b,m,p,waters,parks);
         }
         else{
@@ -171,18 +197,24 @@ public class Player implements pentos.sim.Player {
     //see if current placement is optimal, if so modify move and curr_min
     private void checkOptimal(Land land,Building b,Move m,Cell p,Set<Cell> waters,Set<Cell> parks){
         int curr = leftRemainingCells(land,b,p,waters,parks);
+       //System.out.println("optimal checked for" + b.toString());
         if(curr<left_min){
             m.accept = true;
             m.location = p;
-            m.road = new HashSet<Cell>();
-            m.water = waters;
-            m.park = parks;
+            m.request = b;
+            if(!road_built){
+                m.road = roads;
+                road_built = true;
+            } 
+            m.water = new HashSet<Cell>(waters);
+            m.park = new HashSet<Cell>(parks);
             //find building rotation
-            Building[] rotations = m.request.rotations();
+            Building[] rotations = b.rotations();
             for(int ri = 0; ri < rotations.length; ri++){
                 if(rotations[ri].equals(b)) m.rotation = ri;
             }
             this.left_min = curr;
+            //System.out.println("current optimal is: " + b.toString());
         }
     }
 
@@ -243,7 +275,8 @@ public class Player implements pentos.sim.Player {
     				rightmost = Math.max(rightmost,j);
     			}
     		}
-    		if(rightmost!= Integer.MIN_VALUE && rightmost != side) res.add(new Cell(i,rightmost+1));
+            if(rightmost == Integer.MIN_VALUE) res.add(new Cell(i,0));
+    		else if(rightmost != side) res.add(new Cell(i,rightmost+1));
     	}
     	return res;
     }
