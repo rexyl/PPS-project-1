@@ -35,26 +35,23 @@ public class Player implements pentos.sim.Player {
             road_built = true;
         }
 
-    	List<Cell> startCoors = getStartCoors(land,request.type == FACTORY);
+    	List<Cell> startCoors = getStartCoors(land,request.type == Building.Type.FACTORY);
         this.left_min = Integer.MAX_VALUE;
-        pickMove(startCoors,m,request.type == FACTORY);
+        pickMove(startCoors,m,land,request);
         if(m.accept) return m;
 
     	//this level is full; build roads for next level;
         //update level information
 		Set<Cell> road_cells = new HashSet<Cell>();
 		int row = 0;	
-		if(request.type == FACTORY){
+		if(request.type == Building.Type.FACTORY){
 			factory_level++;	
-			road_row = side - 1 - (factory_level*6-1);	
 		}
 		else{
 			residence_level++;
-			road_row = residence_level*6-1;
 		}
 
-		m.road = road_cells;
-		startCoors = getStartCoors(land,request.type == FACTORY);
+		startCoors = getStartCoors(land,request.type == Building.Type.FACTORY);
 		this.left_min = Integer.MAX_VALUE;
 		pickMove(startCoors,m,land,request);
     	return m;
@@ -68,23 +65,28 @@ public class Player implements pentos.sim.Player {
         int lo = 5;
         int hi = side - 6;
         while(lo<hi){
-            for(int j = 0; j < land.side; j++){
-                Cell road_cell = new Cell(lo,j));
-                Cell road_cell = new Cell(hi,j));
+            for(int j = 0; j < side; j++){
+                Cell road_cell1 = new Cell(lo,j);
+                Cell road_cell2 = new Cell(hi,j);
                 //no room for roads; land must be full
-                roads.add(road_cell);
+                roads.add(road_cell1);
+                roads.add(road_cell2);
+                if(lo-1>=0) road_neighbors.add(new Cell(lo-1,j));
+                if(lo+1<=side-1) road_neighbors.add(new Cell(lo+1,j));
+                if(hi-1>=0) road_neighbors.add(new Cell(hi-1,j));
+                if(hi+1<=side-1) road_neighbors.add(new Cell(hi+1,j));
             }
             lo += 6;
             hi -= 6;
         }
-        m.roads = roads;
+        m.road = roads;
     }
 
 
     //for residence, pick the comb of water and park s.t available left space is the fewest
     //for factory just search all possible placements at starting coordinates
     private void pickMove(List<Cell> startCoors,Move m,Land land,Building request){
-        Building[] rotations = m.request.rotations;  
+        Building[] rotations = request.rotations();  
         for (int ri = 0 ; ri < rotations.length ; ri++) {
             Building b = rotations[ri];
             for(Cell p:startCoors){
@@ -112,8 +114,8 @@ public class Player implements pentos.sim.Player {
     //search all valid placement of 4 cell water and parks
     //find the placement that returns the smallest leftRemainingCell
     private void DFS(Land land,Building b,Move m,Cell p,Set<Cell> waters,Set<Cell> parks){
-        if(request.type == FACTORY){
-            checkOptimal(land,b,m,p,waters,parks,ri);
+        if(b.type == Building.Type.FACTORY){
+            checkOptimal(land,b,m,p,waters,parks);
         }
         else{
             //search water first
@@ -126,7 +128,7 @@ public class Player implements pentos.sim.Player {
                         if(unoccupied(land,n,p,b,waters,parks)){
                             available = true;
                             waters.add(n);
-                            DFS(land,b,m,p,waters,parks,ri);
+                            DFS(land,b,m,p,waters,parks);
                             waters.remove(n);
                         }
                     }
@@ -134,7 +136,7 @@ public class Player implements pentos.sim.Player {
                 //waters are less than 4 but no more cells can be placed
                 //remove water and check optimality
                 if(!available){
-                    checkOptimal(land,b,m,p,new HashSet<Cell>(),parks,ri);
+                    checkOptimal(land,b,m,p,new HashSet<Cell>(),parks);
                 }
             }
             //then park
@@ -145,7 +147,7 @@ public class Player implements pentos.sim.Player {
                     Cell k = itr.next();
                     for(Cell n:k.neighbors()){
                         if(unoccupied(land,n,p,b,waters,parks)){
-                            searched = true;
+                            available = true;
                             parks.add(k);
                             DFS(land,b,m,p,waters,parks);
                             parks.remove(k);
@@ -173,10 +175,10 @@ public class Player implements pentos.sim.Player {
             m.accept = true;
             m.location = p;
             m.road = new HashSet<Cell>();
-            m.waters = waters;
-            m.parks = parks;
+            m.water = waters;
+            m.park = parks;
             //find building rotation
-            Building[] rotations = m.request.rotations;
+            Building[] rotations = m.request.rotations();
             for(int ri = 0; ri < rotations.length; ri++){
                 if(rotations[ri].equals(b)) m.rotation = ri;
             }
@@ -187,18 +189,17 @@ public class Player implements pentos.sim.Player {
     //scan from left to right, stop at the column with all unoccupied cells
     //count the number of unoccupied cells before that column
     private int leftRemainingCells(Land land,Building b,Cell p,Set<Cell> waters,Set<Cell> parks){
-        boolean isFactory = request.type == FACTORY;
+        boolean isFactory = b.type == Building.Type.FACTORY;
+        int side = land.side;
         int row_lo = isFactory? side-1-(factory_level*6+5) : residence_level*6;
         int row_hi = isFactory? side-1-(factory_level*6) : residence_level*6+5;
-        int side = land.side;
         
         int res = 0;
         int j = 0;
         while(j < side){
+            int unoccupied = 0;
             for(int i = row_lo; i < row_hi; i++){
-                Cell dummy = new Cell(i,j);
-                int unoccupied = 0;
-                if(unoccupied(land,dummy,p,b,waters,parks)){
+                if(unoccupied(land,new Cell(i,j),p,b,waters,parks)){
                     unoccupied++;
                 }
             }
@@ -217,7 +218,7 @@ public class Player implements pentos.sim.Player {
             || (land.side-1-c.i)%6==5 ) return false;
 
         //check if this cell conflicts with building
-        Iterator<Cell> itr = request.iterator();
+        Iterator<Cell> itr = b.iterator();
         while(itr.hasNext()){
             Cell tmp = itr.next();
             if(tmp.equals(c)) return false;
