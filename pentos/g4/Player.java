@@ -31,7 +31,7 @@ public class Player implements pentos.sim.Player {
 
     public void print(Move m){
         System.out.println("location: " + m.location.toString());
-        System.out.println("building: " + m.request.toString());
+        System.out.println("building: " + m.request.rotations()[m.rotation].toString());
         System.out.println("rotation: " + Integer.toString(m.rotation));
         System.out.println("water: ");
         for(Cell w:m.water){
@@ -48,7 +48,19 @@ public class Player implements pentos.sim.Player {
     	Move m = new Move(false);
         if(!road_built){
             buildRoad(land.side);
+            m.road = roads;
+            road_built = true;
         }
+        else{
+            m.road = new HashSet<Cell>();
+        }
+
+        System.out.println("In this play roads are: ");
+        for(Cell p:m.road){
+           System.out.print(p.toString());
+        }
+        System.out.println("");
+
     	List<Cell> startCoors = getStartCoors(land,request.type == Building.Type.FACTORY);
         //for(Cell s:startCoors) System.out.println(s.toString());
         this.left_min = Integer.MAX_VALUE;
@@ -108,8 +120,6 @@ public class Player implements pentos.sim.Player {
                 if (land.buildable(b, p) && connected(land,b,p) && !hitRoad(p,b)){
                     Set<Cell> waters = new HashSet<Cell>();
                     Set<Cell> parks = new HashSet<Cell>();
-                    //System.out.println("DFS");
-                    //System.out.println(b.toString());
                     DFS(land,b,m,p,waters,parks,request);
                 }
             }
@@ -137,7 +147,7 @@ public class Player implements pentos.sim.Player {
         while(itr.hasNext()){
             Cell c = itr.next();
             Cell check_cell = new Cell(c.i+location.i, c.j+location.j);
-            if(roads.contains(c)) return true;
+            if(roads.contains(check_cell)) return true;
         }
         return false;
     }
@@ -208,7 +218,6 @@ public class Player implements pentos.sim.Player {
             m.accept = true;
             m.location = p;
             m.request = request;
-            m.road = roads; 
             m.water = new HashSet<Cell>(waters);
             m.park = new HashSet<Cell>(parks);
             //find building rotation
