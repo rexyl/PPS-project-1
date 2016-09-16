@@ -15,6 +15,18 @@ public class Player implements pentos.sim.Player {
     public void init() { // function is called once at the beginning before play is called
 
     }
+    public void print(Move m){
+        System.out.println("location: " + m.location.toString());
+        System.out.println("building: " + m.request.toString());
+        System.out.println("water: ");
+        for(Cell w:m.water){
+            System.out.print(w.toString());
+        }
+        System.out.println("park: ");
+        for(Cell p:m.park){
+            System.out.print(p.toString());
+        }
+    }
     
     public Move play(Building request, Land land) {
 	// find all valid building locations and orientations
@@ -50,6 +62,7 @@ public class Player implements pentos.sim.Player {
 		    markedForConstruction.addAll(chosen.water);
 		    chosen.park = randomWalk(shiftedCells, markedForConstruction, land, 4);
 		}
+		print(chosen);
 		return chosen;
 	    }
 	    else // reject placement if building cannot be connected by road
