@@ -71,6 +71,7 @@ public class Player implements pentos.sim.Player {
         //for(Cell s:startCoors) System.out.println(s.toString());
         this.left_min = Integer.MAX_VALUE;
         pickMove(startCoors,m,land,request);
+        System.out.println("startCoors size:" + startCoors.size());
         if(m.accept){
             //System.out.println("returned here");
             print(m);
@@ -86,6 +87,7 @@ public class Player implements pentos.sim.Player {
 			residence_level++;
 		}
 		startCoors = getStartCoors(land,request.type == Building.Type.FACTORY);
+        System.out.println("2 startCoors size:" + startCoors.size());
 		this.left_min = Integer.MAX_VALUE;
 		pickMove(startCoors,m,land,request);
     	return m;
@@ -123,8 +125,8 @@ public class Player implements pentos.sim.Player {
             Building b = rotations[ri];
             for(Cell p:startCoors){
                 if (land.buildable(b, p) && connected(land,b,p) && !hitRoad(p,b)){
-                    System.out.println("check building: " + b.toString());
-                    System.out.println("location: " + p.toString());
+                    //System.out.println("check building: " + b.toString());
+                    //System.out.println("location: " + p.toString());
                     DFS(land,b,m,p,new HashSet<Cell>(),new HashSet<Cell>(),request,ri);
                 }
             }
@@ -278,34 +280,56 @@ public class Player implements pentos.sim.Player {
     //c is using abosulte coordinates
     private boolean unoccupied(Land land,Cell c,Cell p,Building b,Set<Cell> waters,Set<Cell> parks){
         boolean res = true;
-        if(!land.unoccupied(c) || waters.contains(c) || parks.contains(c) || c.i%6 == 5
-            || (land.side-1-c.i)%6==5 ){
-            res = false;
+        if(!land.unoccupied(c) || waters.contains(c) || parks.contains(c)){
+            return false;
         }
-        else{
-            //check if this cell conflicts with building
-            Iterator<Cell> itr = b.iterator();
-            while(itr.hasNext()){
-                Cell tmp = itr.next();
-                Cell target_lo = new Cell(tmp.i+p.i,tmp.j+p.j);
-                if(target_lo.equals(c)) {
-                    res = false;
-                    break;
-                }
+
+        boolean isFactory = b.type == Building.Type.FACTORY;
+        if(isFactory && (land.side-1-c.i)%6==5) return false;
+        if(!isFactory && c.i%6 == 5) return false;
+        
+        //check if this cell conflicts with building
+        Iterator<Cell> itr = b.iterator();
+        while(itr.hasNext()){
+            Cell tmp = itr.next();
+            Cell target_lo = new Cell(tmp.i+p.i,tmp.j+p.j);
+            if(target_lo.equals(c)) {
+                return false;
             }
         }
-        //System.out.println(c.toString() + " unoccupied? " + res);
-        return res;
+
+        return true;
     }
 
     //return all possible starting placement coors
     private List<Cell> getStartCoors(Land land,boolean isFactory){
     	int side = land.side;
-    	int row_low = isFactory? side-1-(factory_level*6+5) : residence_level*6;
-    	int row_high = isFactory? side-1-(factory_level*6) : residence_level*6+5;
+
+    	//int row_low = isFactory? side-1-(factory_level*6+5) : residence_level*6;
+    	//int row_high = isFactory? side-1-(factory_level*6) : residence_level*6+5;
+        List<Cell> res = new ArrayList<Cell>();
+        
+        if(factory_level > side/12 && isFactory) return res;
+        if(residence_level > side/12 && !isFactory) return res;
+        if(isFactory){
+            int level = factory_level;
+            while(level>=0){
+                res.addAll(getCellInRows(land,side-1-(level*6+5),side-1-(level*6)));
+                level--;
+            }
+        }
+        else{
+            int level = residence_level;
+            while(level>=0){
+                res.addAll(getCellInRows(land,level*6,level*6+5));
+                level--;
+            }
+        }
+
+
+        /*
         int row_lo = row_low, row_hi = row_high;
-    	List<Cell> res = new ArrayList<Cell>();
-        int right_lane = 0;
+        int right_lane = 0;       
     	//go through rows within range, find rightmost available spots;
         while(row_lo>=0 && row_lo<side && row_hi>=0 && row_hi<side){
         	for(int i = row_lo; i < row_hi; i++){
@@ -323,14 +347,43 @@ public class Player implements pentos.sim.Player {
                 }
             }
             if(isFactory){
-                row_lo += 1;
-                row_hi += 1;
+                row_lo += 5;
+                row_hi += 5;
             }
             else{
-                row_lo -= 1;
-                row_hi -= 1;                
+                row_lo -= 5;
+                row_hi -= 5;                
             }
         }
+
+        for(Cell c:res){
+            System.out.print("start cell: " + c.toString());
+        }
+        System.out.println();
+        */
     	return res;
     }
+
+    
+    private List<Cell> getCellInRows(Land land,int row_lo,int row_hi){
+        List<Cell> res = new ArrayList<Cell>();
+        int side = land.side;
+        int right_lane = 0;
+        for(int i = row_lo; i < row_hi; i++){
+            for(int j = 0; j < side; j++){
+                if(!land.unoccupied(new Cell(i,j))){
+                    right_lane = Math.max(j,right_lane);
+                }
+            }
+        }
+        for(int i = row_lo; i < row_hi; i++){
+            for(int j = 0; j < right_lane+2 && j < side; j++){
+                if(land.unoccupied(new Cell(i,j))){
+                    res.add(new Cell(i,j));
+                }
+             }
+        }
+        return res;
+    }
+    
 }
