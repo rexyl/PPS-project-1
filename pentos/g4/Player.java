@@ -301,21 +301,36 @@ public class Player implements pentos.sim.Player {
     //return all possible starting placement coors
     private List<Cell> getStartCoors(Land land,boolean isFactory){
     	int side = land.side;
-    	int row_lo = isFactory? side-1-(factory_level*6+5) : residence_level*6;
-    	int row_hi = isFactory? side-1-(factory_level*6) : residence_level*6+5;
-
+    	int row_low = isFactory? side-1-(factory_level*6+5) : residence_level*6;
+    	int row_high = isFactory? side-1-(factory_level*6) : residence_level*6+5;
+        int row_lo = row_low, row_hi = row_high;
     	List<Cell> res = new ArrayList<Cell>();
+        int right_lane = 0;
     	//go through rows within range, find rightmost available spots;
-    	for(int i = row_lo; i < row_hi; i++){
-    		int rightmost = Integer.MIN_VALUE;
-    		for(int j = 0; j < side; j++){
-    			if(!land.unoccupied(new Cell(i,j))){
-    				rightmost = Math.max(rightmost,j);
-    			}
-    		}
-            if(rightmost == Integer.MIN_VALUE) res.add(new Cell(i,0));
-    		else if(rightmost != side) res.add(new Cell(i,rightmost+1));
-    	}
+        while(row_lo>=0 && row_lo<side && row_hi>=0 && row_hi<side){
+        	for(int i = row_lo; i < row_hi; i++){
+        		for(int j = 0; j < side; j++){
+        			if(!land.unoccupied(new Cell(i,j))){
+                        right_lane = Math.max(j,right_lane);
+        			}
+        		}
+        	}
+            for(int i = row_lo; i < row_hi; i++){
+                for(int j = 0; j < right_lane+1; j++){
+                    if(land.unoccupied(new Cell(i,j))){
+                        res.add(new Cell(i,j));
+                    }
+                }
+            }
+            if(isFactory){
+                row_lo += 1;
+                row_hi += 1;
+            }
+            else{
+                row_lo -= 1;
+                row_hi -= 1;                
+            }
+        }
     	return res;
     }
 }
