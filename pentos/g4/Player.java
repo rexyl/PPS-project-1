@@ -37,14 +37,18 @@ public class Player implements pentos.sim.Player {
         for(Cell w:m.water){
             System.out.print(w.toString());
         }
+        System.out.println();
         System.out.println("park: ");
         for(Cell p:m.park){
             System.out.print(p.toString());
         }
+        System.out.println();
     }
 
 
     public Move play(Building request, Land land) {
+        System.out.println("Play started");
+        System.out.println("====================");
     	Move m = new Move(false);
         if(!road_built){
             buildRoad(land.side);
@@ -55,12 +59,13 @@ public class Player implements pentos.sim.Player {
             m.road = new HashSet<Cell>();
         }
 
+        /*
         System.out.println("In this play roads are: ");
         for(Cell p:m.road){
            System.out.print(p.toString());
         }
         System.out.println("");
-
+        */
     	List<Cell> startCoors = getStartCoors(land,request.type == Building.Type.FACTORY);
         //for(Cell s:startCoors) System.out.println(s.toString());
         this.left_min = Integer.MAX_VALUE;
@@ -68,6 +73,7 @@ public class Player implements pentos.sim.Player {
         if(m.accept){
             //System.out.println("returned here");
             print(m);
+            System.out.println("====================");
             return m;
         }
     	//this level is full; build roads for next level;
@@ -96,7 +102,6 @@ public class Player implements pentos.sim.Player {
             for(int j = 0; j < side; j++){
                 Cell road_cell1 = new Cell(lo,j);
                 Cell road_cell2 = new Cell(hi,j);
-                //no room for roads; land must be full
                 roads.add(road_cell1);
                 roads.add(road_cell2);
                 if(lo-1>=0) road_neighbors.add(new Cell(lo-1,j));
@@ -132,8 +137,9 @@ public class Player implements pentos.sim.Player {
         int side = land.side;
         while(itr.hasNext()){
             Cell c = itr.next();
-            if(c.i == 0 || c.i == side-1 || c.j == 0 || c.j == side-1) return true;
-            if(road_neighbors.contains(c)) return true;
+            Cell loc = new Cell(c.i+p.i,c.j+p.j);
+            if(loc.i == 0 || loc.i == side-1 || loc.j == 0 || loc.j == side-1) return true;
+            if(road_neighbors.contains(loc)) return true;
         }
         return false;
     }
@@ -153,6 +159,11 @@ public class Player implements pentos.sim.Player {
     }
 
 
+    //convert cell b into absolute coordinates
+    private Cell convert(Cell b,Cell p){
+        return new Cell(b.i+p.i,b.j+p.j);
+    }
+
     //search all valid placement of 4 cell water and parks
     //find the placement that returns the smallest leftRemainingCell
     private void DFS(Land land,Building b,Move m,Cell p,Set<Cell> waters,Set<Cell> parks,Building request){
@@ -162,11 +173,13 @@ public class Player implements pentos.sim.Player {
         else{
             //search water first
             if(waters.size()<4){
-                Iterator<Cell> itr = waters.iterator();
+                Set<Cell> copy = new HashSet<Cell>(waters);
+                Iterator<Cell> itr = waters.size() == 0? b.iterator():copy.iterator();
                 boolean available = false;
                 while(itr.hasNext()){
-                    Cell w = itr.next();
-                    for(Cell n:w.neighbors()){
+                    Cell next = itr.next();
+                    Cell curr = waters.size() == 0? convert(next,p) : next;
+                    for(Cell n:curr.neighbors()){
                         if(unoccupied(land,n,p,b,waters,parks)){
                             available = true;
                             waters.add(n);
@@ -183,16 +196,18 @@ public class Player implements pentos.sim.Player {
             }
             //then park
             else if(parks.size()<4){
-                Iterator<Cell> itr = parks.iterator();
+                Set<Cell> copy = new HashSet<Cell>(parks);
+                Iterator<Cell> itr = parks.size() == 0? b.iterator():copy.iterator();
                 boolean available = false;
                 while(itr.hasNext()){
-                    Cell k = itr.next();
-                    for(Cell n:k.neighbors()){
+                    Cell next = itr.next();
+                    Cell curr = parks.size() == 0? convert(next,p) : next;
+                    for(Cell n:curr.neighbors()){
                         if(unoccupied(land,n,p,b,waters,parks)){
                             available = true;
-                            parks.add(k);
+                            parks.add(n);
                             DFS(land,b,m,p,waters,parks,request);
-                            parks.remove(k);
+                            parks.remove(n);
                         }
                     }
                 }
@@ -257,19 +272,27 @@ public class Player implements pentos.sim.Player {
     }
 
 
+    //c is using abosulte coordinates
     private boolean unoccupied(Land land,Cell c,Cell p,Building b,Set<Cell> waters,Set<Cell> parks){
+        boolean res = true;
         if(!land.unoccupied(c) || waters.contains(c) || parks.contains(c) || c.i%6 == 5
-            || (land.side-1-c.i)%6==5 ) return false;
-
-        //check if this cell conflicts with building
-        Iterator<Cell> itr = b.iterator();
-        while(itr.hasNext()){
-            Cell tmp = itr.next();
-            if(tmp.equals(c)) return false;
-            Cell target_lo = new Cell(tmp.i+p.i,tmp.j+p.j);
-            if(target_lo.equals(c)) return false;
-        }   
-        return true;
+            || (land.side-1-c.i)%6==5 ){
+            res = false;
+        }
+        else{
+            //check if this cell conflicts with building
+            Iterator<Cell> itr = b.iterator();
+            while(itr.hasNext()){
+                Cell tmp = itr.next();
+                Cell target_lo = new Cell(tmp.i+p.i,tmp.j+p.j);
+                if(target_lo.equals(c)) {
+                    res = false;
+                    break;
+                }
+            }
+        }
+        //System.out.println(c.toString() + " unoccupied? " + res);
+        return res;
     }
 
     //return all possible starting placement coors
