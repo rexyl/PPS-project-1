@@ -49,6 +49,7 @@ public class Player implements pentos.sim.Player {
     public Move play(Building request, Land land) {
         System.out.println("Play started");
         System.out.println("====================");
+        System.out.println("factory? " + (request.type == Building.Type.FACTORY));
     	Move m = new Move(false);
         if(!road_built){
             buildRoad(land.side);
@@ -84,7 +85,6 @@ public class Player implements pentos.sim.Player {
 		else{
 			residence_level++;
 		}
-
 		startCoors = getStartCoors(land,request.type == Building.Type.FACTORY);
 		this.left_min = Integer.MAX_VALUE;
 		pickMove(startCoors,m,land,request);
@@ -123,9 +123,9 @@ public class Player implements pentos.sim.Player {
             Building b = rotations[ri];
             for(Cell p:startCoors){
                 if (land.buildable(b, p) && connected(land,b,p) && !hitRoad(p,b)){
-                    Set<Cell> waters = new HashSet<Cell>();
-                    Set<Cell> parks = new HashSet<Cell>();
-                    DFS(land,b,m,p,waters,parks,request);
+                    System.out.println("check building: " + b.toString());
+                    System.out.println("location: " + p.toString());
+                    DFS(land,b,m,p,new HashSet<Cell>(),new HashSet<Cell>(),request,ri);
                 }
             }
         }
@@ -166,9 +166,9 @@ public class Player implements pentos.sim.Player {
 
     //search all valid placement of 4 cell water and parks
     //find the placement that returns the smallest leftRemainingCell
-    private void DFS(Land land,Building b,Move m,Cell p,Set<Cell> waters,Set<Cell> parks,Building request){
+    private void DFS(Land land,Building b,Move m,Cell p,Set<Cell> waters,Set<Cell> parks,Building request,int ri){
         if(b.type == Building.Type.FACTORY){
-            checkOptimal(land,b,m,p,waters,parks,request);
+            checkOptimal(land,b,m,p,waters,parks,request,ri);
         }
         else{
             //search water first
@@ -183,7 +183,7 @@ public class Player implements pentos.sim.Player {
                         if(unoccupied(land,n,p,b,waters,parks)){
                             available = true;
                             waters.add(n);
-                            DFS(land,b,m,p,waters,parks,request);
+                            DFS(land,b,m,p,waters,parks,request,ri);
                             waters.remove(n);
                         }
                     }
@@ -191,7 +191,7 @@ public class Player implements pentos.sim.Player {
                 //waters are less than 4 but no more cells can be placed
                 //remove water and check optimality
                 if(!available){
-                    checkOptimal(land,b,m,p,new HashSet<Cell>(),parks,request);
+                    checkOptimal(land,b,m,p,new HashSet<Cell>(),parks,request,ri);
                 }
             }
             //then park
@@ -206,7 +206,7 @@ public class Player implements pentos.sim.Player {
                         if(unoccupied(land,n,p,b,waters,parks)){
                             available = true;
                             parks.add(n);
-                            DFS(land,b,m,p,waters,parks,request);
+                            DFS(land,b,m,p,waters,parks,request,ri);
                             parks.remove(n);
                         }
                     }
@@ -214,19 +214,19 @@ public class Player implements pentos.sim.Player {
                 //parks are less than 4 but no more cells can be placed
                 //remove parks and check optimality
                 if(!available){
-                    checkOptimal(land,b,m,p,waters,new HashSet<Cell>(),request);
+                    checkOptimal(land,b,m,p,waters,new HashSet<Cell>(),request,ri);
                 }
             }
             //both water and park are filled; check leftRemainingCells of this placement
             else{
-                checkOptimal(land,b,m,p,waters,parks,request);
+                checkOptimal(land,b,m,p,waters,parks,request,ri);
             }
         }
     }
 
 
     //see if current placement is optimal, if so modify move and curr_min
-    private void checkOptimal(Land land,Building b,Move m,Cell p,Set<Cell> waters,Set<Cell> parks,Building request){
+    private void checkOptimal(Land land,Building b,Move m,Cell p,Set<Cell> waters,Set<Cell> parks,Building request,int ri){
         int curr = leftRemainingCells(land,b,p,waters,parks);
        //System.out.println("optimal checked for" + b.toString());
         if(curr<left_min){
@@ -235,11 +235,14 @@ public class Player implements pentos.sim.Player {
             m.request = request;
             m.water = new HashSet<Cell>(waters);
             m.park = new HashSet<Cell>(parks);
+            m.rotation = ri;
             //find building rotation
-            Building[] rotations = b.rotations();
+            /*
+            Building[] rotations = request.rotations();
             for(int ri = 0; ri < rotations.length; ri++){
                 if(rotations[ri].equals(b)) m.rotation = ri;
             }
+            */
             this.left_min = curr;
             //System.out.println("current optimal is: " + b.toString());
         }
