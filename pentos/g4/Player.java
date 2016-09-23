@@ -16,7 +16,9 @@ public class Player implements pentos.sim.Player {
 
 	private int factory_level;
 	private int residence_level;
-    private int left_min;
+    private int min_right_cells_num;
+    private int min_right_index;
+    private Cell cur_best;
     private boolean road_built;
     private Set<Cell> road_neighbors;
     private Set<Cell> roads;
@@ -24,7 +26,9 @@ public class Player implements pentos.sim.Player {
 	public void init() { // function is called once at the beginning before play is called
 		this.factory_level = 0;
 		this.residence_level = 0;
-        this.left_min = Integer.MAX_VALUE;
+        this.min_right_cells_num = Integer.MAX_VALUE;
+        this.min_right_index = Integer.MAX_VALUE;
+        this.cur_best = null;
         this.road_built = false;
         this.road_neighbors = new HashSet<Cell>();
     }
@@ -69,7 +73,9 @@ public class Player implements pentos.sim.Player {
         */
     	List<Cell> startCoors = getStartCoors(land,request.type == Building.Type.FACTORY);
         //for(Cell s:startCoors) System.out.println(s.toString());
-        this.left_min = Integer.MAX_VALUE;
+        this.min_right_cells_num = Integer.MAX_VALUE;
+        this.min_right_index = Integer.MAX_VALUE;
+        this.cur_best = null;
         pickMove(startCoors,m,land,request);
         System.out.println("startCoors size:" + startCoors.size());
         if(m.accept){
@@ -88,7 +94,9 @@ public class Player implements pentos.sim.Player {
 		}
 		startCoors = getStartCoors(land,request.type == Building.Type.FACTORY);
         System.out.println("2 startCoors size:" + startCoors.size());
-		this.left_min = Integer.MAX_VALUE;
+		this.min_right_cells_num = Integer.MAX_VALUE;
+        this.min_right_index = Integer.MAX_VALUE;
+        this.cur_best = null;
 		pickMove(startCoors,m,land,request);
     	return m;
     }
@@ -126,7 +134,7 @@ public class Player implements pentos.sim.Player {
             for(Cell p:startCoors){
                 if (land.buildable(b, p) && connected(land,b,p) && !hitRoad(p,b)){
                     //System.out.println("check building: " + b.toString());
-                    //System.out.println("location: " + p.toString());
+                    System.out.println("location: " + p.toString() + " is buildable");
                     DFS(land,b,m,p,new HashSet<Cell>(),new HashSet<Cell>(),request,ri);
                 }
             }
@@ -226,18 +234,49 @@ public class Player implements pentos.sim.Player {
         }
     }
 
+    private int[] findRightMostBuildingCellIndex(Building b, Cell p){
+        int right_most_ind = 0, right_cells_num = 0;
+        for(Cell building_cell:b){
+            if (building_cell.j+p.j > right_most_ind) {
+                right_most_ind = building_cell.j+p.j;
+            }
+        }
+        for(Cell building_cell:b){
+            if (building_cell.j+p.j == right_most_ind) {
+                right_cells_num++;
+            }
+        }
+        return new int[]{right_most_ind, right_cells_num};
+    }
 
     //see if current placement is optimal, if so modify move and curr_min
     private void checkOptimal(Land land,Building b,Move m,Cell p,Set<Cell> waters,Set<Cell> parks,Building request,int ri){
-        int curr = leftRemainingCells(land,b,p,waters,parks);
+        //int curr = leftRemainingCells(land,b,p,waters,parks);
        //System.out.println("optimal checked for" + b.toString());
-        if(curr<left_min){
+        //System.out.println(left_min);    
+        int[] temp = findRightMostBuildingCellIndex(b,p);
+        int right_most_ind = temp[0];
+        int right_cells_num = temp[1];
+        if (right_most_ind < min_right_index || (right_most_ind == min_right_index && right_cells_num < min_right_cells_num) ) {
+            cur_best = p;
+            min_right_index = right_most_ind;
+            min_right_cells_num = right_cells_num;
+
             m.accept = true;
             m.location = p;
             m.request = request;
             m.water = new HashSet<Cell>(waters);
             m.park = new HashSet<Cell>(parks);
             m.rotation = ri;
+            return;
+        }
+        // if(curr<left_min){
+        //     m.accept = true;
+        //     m.location = p;
+        //     m.request = request;
+        //     m.water = new HashSet<Cell>(waters);
+        //     m.park = new HashSet<Cell>(parks);
+        //     m.rotation = ri;
             //find building rotation
             /*
             Building[] rotations = request.rotations();
@@ -245,9 +284,9 @@ public class Player implements pentos.sim.Player {
                 if(rotations[ri].equals(b)) m.rotation = ri;
             }
             */
-            this.left_min = curr;
+            //this.left_min = curr;
             //System.out.println("current optimal is: " + b.toString());
-        }
+        
     }
 
     //scan from left to right, stop at the column with all unoccupied cells
@@ -305,8 +344,6 @@ public class Player implements pentos.sim.Player {
     private List<Cell> getStartCoors(Land land,boolean isFactory){
     	int side = land.side;
 
-    	//int row_low = isFactory? side-1-(factory_level*6+5) : residence_level*6;
-    	//int row_high = isFactory? side-1-(factory_level*6) : residence_level*6+5;
         List<Cell> res = new ArrayList<Cell>();
         
         if(factory_level > side/12 && isFactory) return res;
@@ -314,7 +351,7 @@ public class Player implements pentos.sim.Player {
         if(isFactory){
             int level = factory_level;
             while(level>=0){
-                res.addAll(getCellInRows(land,side-1-(level*6+5),side-1-(level*6)));
+                res.addAll(getCellInRows(land,side-(level*6+5),side-(level*6)));
                 level--;
             }
         }
@@ -326,41 +363,41 @@ public class Player implements pentos.sim.Player {
             }
         }
 
-
-        /*
-        int row_lo = row_low, row_hi = row_high;
-        int right_lane = 0;       
-    	//go through rows within range, find rightmost available spots;
-        while(row_lo>=0 && row_lo<side && row_hi>=0 && row_hi<side){
-        	for(int i = row_lo; i < row_hi; i++){
-        		for(int j = 0; j < side; j++){
-        			if(!land.unoccupied(new Cell(i,j))){
-                        right_lane = Math.max(j,right_lane);
-        			}
-        		}
-        	}
-            for(int i = row_lo; i < row_hi; i++){
-                for(int j = 0; j < right_lane+1; j++){
-                    if(land.unoccupied(new Cell(i,j))){
-                        res.add(new Cell(i,j));
-                    }
-                }
-            }
-            if(isFactory){
-                row_lo += 5;
-                row_hi += 5;
-            }
-            else{
-                row_lo -= 5;
-                row_hi -= 5;                
-            }
-        }
+     //    int row_low = isFactory? side-1-(factory_level*6+5) : residence_level*6;
+     //    int row_high = isFactory? side-1-(factory_level*6) : residence_level*6+5;
+     //    int row_lo = row_low, row_hi = row_high;
+     //    int right_lane = 0;       
+    	// //go through rows within range, find rightmost available spots;
+     //    while(row_lo>=0 && row_lo<side && row_hi>=0 && row_hi<side){
+     //    	for(int i = row_lo; i < row_hi; i++){
+     //    		for(int j = 0; j < side; j++){
+     //    			if(!land.unoccupied(new Cell(i,j))){
+     //                    right_lane = Math.max(j,right_lane);
+     //    			}
+     //    		}
+     //    	}
+     //        for(int i = row_lo; i < row_hi; i++){
+     //            for(int j = 0; j < right_lane+1; j++){
+     //                if(land.unoccupied(new Cell(i,j))){
+     //                    res.add(new Cell(i,j));
+     //                }
+     //            }
+     //        }
+     //        if(isFactory){
+     //            row_lo += 5;
+     //            row_hi += 5;
+     //        }
+     //        else{
+     //            row_lo -= 5;
+     //            row_hi -= 5;                
+     //        }
+     //    }
 
         for(Cell c:res){
             System.out.print("start cell: " + c.toString());
         }
         System.out.println();
-        */
+
     	return res;
     }
 
@@ -376,8 +413,11 @@ public class Player implements pentos.sim.Player {
                 }
             }
         }
+        if (right_lane>0 && right_lane+1<side) {
+            right_lane++;
+        }
         for(int i = row_lo; i < row_hi; i++){
-            for(int j = 0; j < right_lane+2 && j < side; j++){
+            for(int j = 0; j < right_lane+1 && j < side; j++){
                 if(land.unoccupied(new Cell(i,j))){
                     res.add(new Cell(i,j));
                 }
