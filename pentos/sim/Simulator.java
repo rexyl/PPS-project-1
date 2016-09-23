@@ -38,7 +38,7 @@ class Simulator {
 			throw new IllegalArgumentException("Missing sequencer name");
 		    sequencer = args[++a];
 		}
-		else if (args[a].equals("--gui-fps")) {
+		else if (args[a].equals("--fps")) {
 		    if (++a == args.length)
 			throw new IllegalArgumentException("Missing GUI FPS");
 		    double gui_fps = Double.parseDouble(args[a]);
@@ -230,7 +230,7 @@ class Simulator {
 		if (!gui) continue;
 		moves.add(move);
 		gui(server, state(group, score, timer.time(), moves, gui_refresh, -1));
-	    }	
+	    }
 	} while (numRejects < 3);
 	// final GUI frame
 	if (gui) {
