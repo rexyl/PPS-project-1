@@ -86,6 +86,10 @@ public class Cell implements Comparable <Cell> {
 
     private void buildType(Type t) {
 	if (type != Type.EMPTY) {
+		System.out.println("land not empty");
+		System.out.println("type: " + t);
+		Scanner in = new Scanner(System.in);
+		String s = in.nextLine();		
 	    throw new RuntimeException("Land not empty. Contains " + type);
 	}
 	this.type = t;

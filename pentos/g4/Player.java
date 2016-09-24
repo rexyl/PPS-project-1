@@ -13,24 +13,14 @@ public class Player implements pentos.sim.Player {
     private Set<Cell> road_cells;
     private int min;
     private int max;
-    //private int resident_right;
-    //private int resident_down;
-    //private int factory_left;
-    //private int factory_up;
+
 
     public void init() { // function is called once at the beginning before play is called
         this.gen = new Random();
         this.road_cells = new HashSet<Cell>();
-        /*
-        this.resident_right = 5;
-        this.resident_down = 5;
-        //TODO Land.side
-        this.factory_left =  50 - 5;
-        this.factory_up = 50 - 5;
-        */
     }
 
-public void print(Move m){
+    public void print(Move m){
         System.out.println("location: " + m.location.toString());
         System.out.println("building: " + m.request.rotations()[m.rotation].toString());
         System.out.println("rotation: " + Integer.toString(m.rotation));
@@ -60,12 +50,10 @@ public void print(Move m){
         System.out.println("play started");
         System.out.println("request: " + request.toString());
         this.min = Integer.MAX_VALUE;
-        this.max= Integer.MIN_VALUE;
+        this.max = Integer.MIN_VALUE;
         for (int i = 0 ; i < land.side ; i++){
             for (int j = 0 ; j < land.side ; j++) {
                 Cell p = new Cell(i, j);
-                //if(!bounded(p,request.type == Building.Type.FACTORY)) continue;
-                //System.out.println(p.toString());
                 Building[] rotations = request.rotations();
                 for (int ri = 0 ; ri < rotations.length ; ri++) {
                     Building b = rotations[ri];
@@ -83,36 +71,6 @@ public void print(Move m){
         return m;
     }
 
-    /*
-    private boolean bounded(Cell c,boolean isFactory){
-        if(isFactory){
-            return c.i >= this.factory_up && c.j >= this.factory_left;
-        }
-        return c.i <= this.resident_down && c.j <= this.resident_right;
-    }
-
-
-    private void updateBoundary(Move m){
-        Set<Cell> b = buildingToSet(m.request.rotations()[m.rotation],m.location);
-        boolean isFactory = m.request.type == Building.Type.FACTORY;
-        if(isFactory){
-            for(Cell c:b){
-                this.factory_up = Math.min(this.factory_up,c.i);
-                this.factory_left = Math.min(this.factory_left,c.j);
-            }
-            this.factory_up--;
-            this.factory_left--;
-        }
-        else{
-            for(Cell c:b){
-                this.resident_down = Math.max(this.resident_down,c.i);
-                this.resident_right = Math.max(this.resident_right,c.j);
-            }
-            this.resident_down++;
-            this.resident_right++;
-        }
-    }
-    */
     //return abosulte coordinates of a building in cell
     private Set<Cell> buildingToSet(Building building,Cell p){
         Set<Cell> b = new HashSet<Cell>();
@@ -126,7 +84,7 @@ public void print(Move m){
     private void search(Move m,Building b, Land land, Cell p, int ri, Building request){
         Set<Cell> building = buildingToSet(b,p);
         Set<Cell> waters = new HashSet<Cell>();
-        if(false && request.type == Building.Type.RESIDENCE) {
+        if(request.type == Building.Type.RESIDENCE) {
             waters = findShortestWater(building,land,new HashSet<Cell>(),new HashSet<Cell>());
         }
         checkOptimal(land, b, m, p, waters, new HashSet<Cell>(), request, ri);
@@ -146,7 +104,7 @@ public void print(Move m){
         for(Cell b:building){ 
             if(hitSide(b,land.side)) return new HashSet<Cell>();
             for(Cell start:b.neighbors()){
-                if(road_cells.contains(b)) return new HashSet<Cell>();
+                if(road_cells.contains(start)) return new HashSet<Cell>();
                 if(land.unoccupied(start) && !building.contains(start) && !waters.contains(start) && !parks.contains(start)){
                     queue.offer(start);
                     //System.out.println("start: " + start.toString());
@@ -161,6 +119,7 @@ public void print(Move m){
             checked[curr.i][curr.j] = true;
             if(road_cells.contains(curr)){
                 end = curr.previous;
+                stop = true;
                 break;
             }
             else if(hitSide(curr,side)){
@@ -190,54 +149,61 @@ public void print(Move m){
 
 
     // all cells here use absolute coordinates
-    // build shortest sequence of road cells to connect to a set of cells b
+    // build shortest sequence of water cells to connect to a set of cells b
+    // if there are more than 4 water cells, take first four
     private Set<Cell> findShortestWater(Set<Cell> building, Land land, Set<Cell> waters, Set<Cell> parks) {
         Set<Cell> output = new HashSet<Cell>();
         boolean[][] checked = new boolean[land.side][land.side];
         Queue<Cell> queue = new LinkedList<Cell>();
         int side = land.side;
-        for(Cell b:building){ 
+        for(Cell b:building){
             for(Cell start:b.neighbors()){
+                if(start.isWater()) return output;
                 if(land.unoccupied(start) && !building.contains(start)){
                     queue.offer(start);
                 }
             }
         }
-        
-        boolean stop = false;
+
+        //System.out.println("queue size before: " + queue.size() );
+        //System.out.println("there");
         Cell end = null;
-        Cell marker = null;
+        boolean stop = false;
+        Cell marker = new Cell(land.side+1,land.side+1);
+        queue.offer(marker);
         int level = 1;
-        queue.add(marker);
-        while (!queue.isEmpty() && !stop) {
+        while (!queue.isEmpty() && !stop){
+            //System.out.println(level);
             Cell curr = queue.poll();
-            if(curr == null){
+            if(curr.equals(marker)){
                 level++;
-                queue.offer(null);
-                //System.out.println(level);
+                if(!queue.isEmpty()) queue.offer(marker);
                 continue;
             }
             checked[curr.i][curr.j] = true;
-            
             for (Cell n : curr.neighbors()) { 
-                if(checked[n.i][n.j]) continue;
-                n.previous = curr;    
-                if(level >= 4 || n.isType(Cell.Type.WATER)){
+                if(checked[n.i][n.j]){
+                    continue;
+                } 
+                if(n.isWater() || level>=4){
                     end = curr;
                     stop = true;
                     break;
-                }  
+                }
+                checked[n.i][n.j] = true;
+                n.previous = curr;                    
                 if (land.unoccupied(n) && !building.contains(n)) {
                     queue.offer(n);
                 }
             }
         }
-        
-        while(end != null){
+
+        //if(end!=null) System.out.println("here");
+        while(end != null && level>0){
+            level--;
             output.add(end);
             end = end.previous;
         }
-        //System.out.println("here");
         return output;
     }
 
@@ -268,11 +234,12 @@ public void print(Move m){
 
     private void checkOptimal(Land land, Building b, Move m, Cell p, Set<Cell> waters, Set<Cell> parks, Building request, int ri){      
         int sum = calcSum(b,p,waters,parks);
-        if ( (request.type == Building.Type.RESIDENCE && sum < min) || 
-         (request.type == Building.Type.FACTORY && sum > max) ) {
-            if(request.type == Building.Type.RESIDENCE) min = sum;
-            if(request.type == Building.Type.FACTORY) max = sum;
-
+        boolean isFactory = request.type == Building.Type.FACTORY;
+        if(!isFactory){
+            sum +=  buildingToSet(b,p).size() * waters.size();
+            sum += buildingToSet(b,p).size() * parks.size();
+        }
+        if ( (!isFactory && sum <= min) || (isFactory && sum >= max) ) {
             Set<Cell> new_roads = findShortestRoad(buildingToSet(b,p),land,waters,new HashSet<Cell>());
             if(new_roads == null){
                 return;
@@ -284,6 +251,8 @@ public void print(Move m){
             m.water = new HashSet<Cell>(waters);
             m.park = new HashSet<Cell>(parks);
             m.rotation = ri;
+            if(!isFactory) min = sum;
+            else max = sum;
         }
     }
 
