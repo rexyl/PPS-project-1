@@ -144,8 +144,9 @@ public void print(Move m){
         Queue<Cell> queue = new LinkedList<Cell>();
         int side = land.side;
         for(Cell b:building){ 
-            if(road_cells.contains(b) || hitSide(b,land.side)) return new HashSet<Cell>();
+            if(hitSide(b,land.side)) return new HashSet<Cell>();
             for(Cell start:b.neighbors()){
+                if(road_cells.contains(b)) return new HashSet<Cell>();
                 if(land.unoccupied(start) && !building.contains(start) && !waters.contains(start) && !parks.contains(start)){
                     queue.offer(start);
                     //System.out.println("start: " + start.toString());
