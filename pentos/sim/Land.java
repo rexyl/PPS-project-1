@@ -95,8 +95,11 @@ public class Land {
     }
     // return -1 if building cannot be built. Otherwise return the score accrued from constructing the building
     protected int build(Building building, Cell q) {
-	if (!buildable(building, q))
+	if (!buildable(building, q)){
+		Scanner in = new Scanner(System.in);
+		String s = in.nextLine();
 	    throw new RuntimeException("Building not buildable.");
+	}
 	int score = 0;
 	for (Cell p : building) {
 	    if (building.type == Building.Type.FACTORY)

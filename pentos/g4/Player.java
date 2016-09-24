@@ -116,17 +116,28 @@ public void print(Move m){
     }
 
     private void search(Move m,Building b, Land land, Cell p, int ri, Building request){
-        Set<Cell> waters = findShortestWater(buildingToSet(b,p),land,new HashSet<Cell>(),new HashSet<Cell>());
+        Set<Cell> building = buildingToSet(b,p);
+        Set<Cell> waters = findShortestWater(building,land,new HashSet<Cell>(),new HashSet<Cell>());
         checkOptimal(land, b, m, p, waters, new HashSet<Cell>(), request, ri);
         if(!m.accept) return;
-        Set<Cell> new_roads = findShortestRoad(buildingToSet(b,p),land,waters,new HashSet<Cell>());
+        for(Cell c:building){
+            if(hitSide(c,land.side)){
+                m.road = new HashSet<Cell>();
+                return;
+            }
+        }
+
+        Set<Cell> new_roads = findShortestRoad(building,land,waters,new HashSet<Cell>());
+        if(new_roads.size() == 0){
+            m.accept = false;
+            return;
+        }
         m.road = new_roads;
     }
     
     private boolean hitSide(Cell b,int side){
         return (b.i == 0 || b.i == side -1 || b.j == 0 || b.j == side - 1);
     }
-
 
     // all cells here use absolute coordinates
     // build shortest sequence of road cells to connect to a set of cells b
@@ -137,7 +148,7 @@ public void print(Move m){
         int side = land.side;
         for(Cell b:building){ 
             for(Cell start:b.neighbors()){
-                if(!hitSide(start,side) && land.unoccupied(start) && !building.contains(start) && !waters.contains(start) && !parks.contains(start)){
+                if(land.unoccupied(start) && !building.contains(start) && !waters.contains(start) && !parks.contains(start)){
                     queue.offer(start);
                 }
             }
