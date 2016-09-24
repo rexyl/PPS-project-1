@@ -13,19 +13,21 @@ public class Player implements pentos.sim.Player {
     private Set<Cell> road_cells;
     private int min;
     private int max;
-    private int resident_right;
-    private int resident_down;
-    private int factory_left;
-    private int factory_up;
+    //private int resident_right;
+    //private int resident_down;
+    //private int factory_left;
+    //private int factory_up;
 
     public void init() { // function is called once at the beginning before play is called
         this.gen = new Random();
         this.road_cells = new HashSet<Cell>();
+        /*
         this.resident_right = 5;
         this.resident_down = 5;
         //TODO Land.side
         this.factory_left =  50 - 5;
         this.factory_up = 50 - 5;
+        */
     }
 
 public void print(Move m){
@@ -62,7 +64,7 @@ public void print(Move m){
         for (int i = 0 ; i < land.side ; i++){
             for (int j = 0 ; j < land.side ; j++) {
                 Cell p = new Cell(i, j);
-                if(!bounded(p,request.type == Building.Type.FACTORY)) continue;
+                //if(!bounded(p,request.type == Building.Type.FACTORY)) continue;
                 //System.out.println(p.toString());
                 Building[] rotations = request.rotations();
                 for (int ri = 0 ; ri < rotations.length ; ri++) {
@@ -75,18 +77,20 @@ public void print(Move m){
         }
         if(m.accept){
             road_cells.addAll(m.road);
-            updateBoundary(m);
+            //updateBoundary(m);
             print(m);
         } 
         return m;
     }
 
+    /*
     private boolean bounded(Cell c,boolean isFactory){
         if(isFactory){
             return c.i >= this.factory_up && c.j >= this.factory_left;
         }
         return c.i <= this.resident_down && c.j <= this.resident_right;
     }
+
 
     private void updateBoundary(Move m){
         Set<Cell> b = buildingToSet(m.request.rotations()[m.rotation],m.location);
@@ -96,15 +100,19 @@ public void print(Move m){
                 this.factory_up = Math.min(this.factory_up,c.i);
                 this.factory_left = Math.min(this.factory_left,c.j);
             }
+            this.factory_up--;
+            this.factory_left--;
         }
         else{
             for(Cell c:b){
                 this.resident_down = Math.max(this.resident_down,c.i);
-                this.resident_right= Math.max(this.resident_right,c.j);
+                this.resident_right = Math.max(this.resident_right,c.j);
             }
+            this.resident_down++;
+            this.resident_right++;
         }
     }
-
+    */
     //return abosulte coordinates of a building in cell
     private Set<Cell> buildingToSet(Building building,Cell p){
         Set<Cell> b = new HashSet<Cell>();
@@ -117,22 +125,11 @@ public void print(Move m){
 
     private void search(Move m,Building b, Land land, Cell p, int ri, Building request){
         Set<Cell> building = buildingToSet(b,p);
-        Set<Cell> waters = findShortestWater(building,land,new HashSet<Cell>(),new HashSet<Cell>());
+        Set<Cell> waters = new HashSet<Cell>();
+        if(false && request.type == Building.Type.RESIDENCE) {
+            waters = findShortestWater(building,land,new HashSet<Cell>(),new HashSet<Cell>());
+        }
         checkOptimal(land, b, m, p, waters, new HashSet<Cell>(), request, ri);
-        if(!m.accept) return;
-        for(Cell c:building){
-            if(hitSide(c,land.side)){
-                m.road = new HashSet<Cell>();
-                return;
-            }
-        }
-
-        Set<Cell> new_roads = findShortestRoad(building,land,waters,new HashSet<Cell>());
-        if(new_roads.size() == 0){
-            m.accept = false;
-            return;
-        }
-        m.road = new_roads;
     }
     
     private boolean hitSide(Cell b,int side){
@@ -147,9 +144,11 @@ public void print(Move m){
         Queue<Cell> queue = new LinkedList<Cell>();
         int side = land.side;
         for(Cell b:building){ 
+            if(road_cells.contains(b) || hitSide(b,land.side)) return new HashSet<Cell>();
             for(Cell start:b.neighbors()){
                 if(land.unoccupied(start) && !building.contains(start) && !waters.contains(start) && !parks.contains(start)){
                     queue.offer(start);
+                    //System.out.println("start: " + start.toString());
                 }
             }
         }
@@ -179,6 +178,7 @@ public void print(Move m){
                 }
             }
         }
+        if(!stop) return null;
         while(end != null){
             output.add(end);
             end = end.previous;
@@ -272,13 +272,17 @@ public void print(Move m){
             if(request.type == Building.Type.RESIDENCE) min = sum;
             if(request.type == Building.Type.FACTORY) max = sum;
 
+            Set<Cell> new_roads = findShortestRoad(buildingToSet(b,p),land,waters,new HashSet<Cell>());
+            if(new_roads == null){
+                return;
+            }
+            m.road = new_roads;
             m.accept = true;
             m.location = p;
             m.request = request;
             m.water = new HashSet<Cell>(waters);
             m.park = new HashSet<Cell>(parks);
             m.rotation = ri;
-            return;
         }
     }
 
