@@ -201,14 +201,13 @@ public class Player implements pentos.sim.Player {
         checkOptimal(land,b,m,p,waters,parks,request,ri);
     }
 
-
-    //see if current placement is optimal, if so modify move and curr_min
     private void checkOptimal(Land land, Building b, Move m, Cell p, Set<Cell> waters, Set<Cell> parks, Building request, int ri){      
         int sum = calcSum(b,p,waters,parks);
         if ( (request.type == Building.Type.RESIDENCE && sum < min) || 
          (request.type == Building.Type.FACTORY && sum > max) ) {
             if(request.type == Building.Type.RESIDENCE) min = sum;
             if(request.type == Building.Type.FACTORY) max = sum;
+
             m.accept = true;
             m.location = p;
             m.request = request;

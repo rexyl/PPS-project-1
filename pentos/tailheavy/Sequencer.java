@@ -7,14 +7,14 @@ import pentos.sim.Cell;
 public class Sequencer implements pentos.sim.Sequencer {
 
     private Random gen;
-    private final double ratio = 0; // ratio of residences to total number of buildings
+    private final double ratio = 0.7; // ratio of residences to total number of buildings
 
     public void init() {
 	gen = new Random();
     }
     
     public Building next() {
-	if (gen.nextDouble() > ratio)
+	if (gen.nextDouble() > 0.7)
 	    return randomFactory();
 	else
 	    return randomResidence();
