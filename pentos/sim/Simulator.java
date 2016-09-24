@@ -222,8 +222,11 @@ class Simulator {
 		for (Cell p : rotated_building)
 		    buildingCells = buildingCells + " (" + (p.i+move.location.i) + "," + (p.j+move.location.j) + ")";
 		int delta = land.build(rotated_building, move.location);
-		if (delta == -1)
+		if (delta == -1){
+		    Scanner in = new Scanner(System.in);
+		    String s = in.nextLine();
 		    throw new RuntimeException("Invalid building placement");
+		}
 		if (log)
 		    System.err.println("Player " + group + " built building on cells" + buildingCells + " and scored " + delta + ".");
 		score.addAndGet(delta); 	
