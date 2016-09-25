@@ -11,13 +11,17 @@ public class Player implements pentos.sim.Player {
 
     private Random gen;
     private Set<Cell> road_cells;
+    private Set<Cell> water_cells;
+    private Set<Cell> park_cells;
     private int min;
     private int max;
-
+    public enum Type {PARK, WATER, ROAD};
 
     public void init() { // function is called once at the beginning before play is called
         this.gen = new Random();
         this.road_cells = new HashSet<Cell>();
+        this.water_cells = new HashSet<Cell>();
+        this.park_cells = new HashSet<Cell>();
     }
 
     public void print(Move m){
@@ -40,13 +44,11 @@ public class Player implements pentos.sim.Player {
         }
         System.out.println();
     }
-
-
-
     
     public Move play(Building request, Land land) {
         // find all valid building locations and orientations
         Move m = new Move(false);
+        System.out.println();
         System.out.println("play started");
         System.out.println("request: " + request.toString());
         this.min = Integer.MAX_VALUE;
@@ -58,15 +60,16 @@ public class Player implements pentos.sim.Player {
                 for (int ri = 0 ; ri < rotations.length ; ri++) {
                     Building b = rotations[ri];
                     if (land.buildable(b, p)){
-                        search(m,b,land,p,ri,request);
+                        search(m,buildingToSet(b,p),land,p,ri,request);
                     }
                 }
             }
         }
         if(m.accept){
             road_cells.addAll(m.road);
-            //updateBoundary(m);
-            print(m);
+            water_cells.addAll(m.water);
+            park_cells.addAll(m.park);
+            //print(m);
         } 
         return m;
     }
@@ -81,86 +84,65 @@ public class Player implements pentos.sim.Player {
         return b;
     }
 
-    private void search(Move m,Building b, Land land, Cell p, int ri, Building request){
-        Set<Cell> building = buildingToSet(b,p);
+    private void search(Move m,Set<Cell> b, Land land, Cell p, int ri, Building request){
         Set<Cell> waters = new HashSet<Cell>();
+        Set<Cell> parks = new HashSet<Cell>();
         if(request.type == Building.Type.RESIDENCE) {
-            waters = findShortestWater(building,land,new HashSet<Cell>(),new HashSet<Cell>());
+            waters = findShortest(b,land,new HashSet<Cell>(),new HashSet<Cell>(),new HashSet<Cell>(),Type.WATER,4);
+            if(waters == null) waters = new HashSet<Cell>();
+            parks = findShortest(b,land,waters,parks,new HashSet<Cell>(),Type.PARK,4);
+            if(parks == null) parks = new HashSet<Cell>();
         }
-        checkOptimal(land, b, m, p, waters, new HashSet<Cell>(), request, ri);
+        checkOptimal(land, b, m, p, waters, parks, request, ri);
     }
     
     private boolean hitSide(Cell b,int side){
         return (b.i == 0 || b.i == side -1 || b.j == 0 || b.j == side - 1);
     }
 
-    // all cells here use absolute coordinates
-    // build shortest sequence of road cells to connect to a set of cells b
-    private Set<Cell> findShortestRoad(Set<Cell> building, Land land, Set<Cell> waters, Set<Cell> parks) {
-        Set<Cell> output = new HashSet<Cell>();
-        boolean[][] checked = new boolean[land.side][land.side];
-        Queue<Cell> queue = new LinkedList<Cell>();
-        int side = land.side;
-        for(Cell b:building){ 
-            if(hitSide(b,land.side)) return new HashSet<Cell>();
-            for(Cell start:b.neighbors()){
-                if(road_cells.contains(start)) return new HashSet<Cell>();
-                if(land.unoccupied(start) && !building.contains(start) && !waters.contains(start) && !parks.contains(start)){
-                    queue.offer(start);
-                    //System.out.println("start: " + start.toString());
+    //return true if current cell hits the target we want to search
+    private boolean hitTarget(Cell c,Type type,int side){
+        if(type == Type.ROAD){
+            if(hitSide(c,side)) return true;
+            for(Cell r:road_cells){
+                for(Cell n:r.neighbors()){
+                    if(n.equals(c)) return true;
                 }
             }
         }
-        
-        boolean stop = false;
-        Cell end = null;
-        while (!queue.isEmpty() && !stop) {
-            Cell curr = queue.poll();
-            checked[curr.i][curr.j] = true;
-            if(road_cells.contains(curr)){
-                end = curr.previous;
-                stop = true;
-                break;
-            }
-            else if(hitSide(curr,side)){
-                end = curr;
-                stop = true;
-                break;
-            }
-            for (Cell n : curr.neighbors()) { 
-                if(checked[n.i][n.j]) continue;
-                n.previous = curr;    
-                if(road_cells.contains(n)){
-                    queue.offer(n);
-                }  
-                else if (land.unoccupied(n) && !building.contains(n) && !waters.contains(n) && !parks.contains(n)) {
-                    queue.offer(n);
+        else if(type == Type.WATER){
+            for(Cell w:water_cells){
+                for(Cell n:w.neighbors()){
+                    if(n.equals(c)) return true;
                 }
             }
         }
-        if(!stop) return null;
-        while(end != null){
-            output.add(end);
-            end = end.previous;
+        else{
+            for(Cell p:park_cells){
+                for(Cell n:p.neighbors()){
+                    if(n.equals(c)) return true;
+                }
+            }
         }
-        return output;
+        return false;
     }
 
 
 
-    // all cells here use absolute coordinates
-    // build shortest sequence of water cells to connect to a set of cells b
-    // if there are more than 4 water cells, take first four
-    private Set<Cell> findShortestWater(Set<Cell> building, Land land, Set<Cell> waters, Set<Cell> parks) {
-        Set<Cell> output = new HashSet<Cell>();
+    private Set<Cell> findShortest(Set<Cell> building, Land land, Set<Cell> waters, Set<Cell> parks, Set<Cell> roads,
+        Type type, int depth){
         boolean[][] checked = new boolean[land.side][land.side];
         Queue<Cell> queue = new LinkedList<Cell>();
         int side = land.side;
         for(Cell b:building){
+            //if building is direct neighbor to targets, return empty set;
+            if(hitTarget(b,type,side)) return new HashSet<Cell>();
             for(Cell start:b.neighbors()){
-                if(start.isWater()) return output;
-                if(land.unoccupied(start) && !building.contains(start)){
+                //else push all direct neighbor of building to queue
+                if(land.unoccupied(start) && !building.contains(start) && !waters.contains(start)
+                    && !parks.contains(start) && !roads.contains(start)){
                     queue.offer(start);
+                    //System.out.println("start");
                 }
             }
         }
@@ -168,38 +150,37 @@ public class Player implements pentos.sim.Player {
         //System.out.println("queue size before: " + queue.size() );
         //System.out.println("there");
         Cell end = null;
-        boolean stop = false;
-        Cell marker = new Cell(land.side+1,land.side+1);
+        Cell marker = new Cell(side+1,side+1);
         queue.offer(marker);
         int level = 1;
-        while (!queue.isEmpty() && !stop){
-            //System.out.println(level);
+        while (!queue.isEmpty()){
             Cell curr = queue.poll();
-            if(curr.equals(marker)){
+            if(hitTarget(curr,type,side) || level>=depth){
+                end = curr;
+                break;
+            }
+            else if(curr.equals(marker)){
                 level++;
                 if(!queue.isEmpty()) queue.offer(marker);
-                continue;
             }
-            checked[curr.i][curr.j] = true;
-            for (Cell n : curr.neighbors()) { 
-                if(checked[n.i][n.j]){
-                    continue;
-                } 
-                if(n.isWater() || level>=4){
-                    end = curr;
-                    stop = true;
-                    break;
-                }
-                checked[n.i][n.j] = true;
-                n.previous = curr;                    
-                if (land.unoccupied(n) && !building.contains(n)) {
-                    queue.offer(n);
+            else{
+                for(Cell n : curr.neighbors()) { 
+                    if(!checked[n.i][n.j]){
+                        checked[n.i][n.j] = true;
+                        n.previous = curr;            
+                        if (land.unoccupied(n) && !building.contains(n) && !waters.contains(n) && !parks.contains(n) && !roads.contains(n)) {
+                            queue.offer(n);
+                        }
+                    }
                 }
             }
         }
-
-        //if(end!=null) System.out.println("here");
-        while(end != null && level>0){
+        //System.out.println("level: " + level);
+        if(end==null){
+            return null;
+        }
+        Set<Cell> output = new HashSet<Cell>();
+        while(end != null && level > 0){
             level--;
             output.add(end);
             end = end.previous;
@@ -207,11 +188,12 @@ public class Player implements pentos.sim.Player {
         return output;
     }
 
-     private int calcSum(Building b, Cell p,Set<Cell> waters,Set<Cell> parks){
+
+     private int calcSum(Set<Cell> b, Cell p,Set<Cell> waters,Set<Cell> parks){
         int sum = 0;
         for(Cell building_cell:b){
-            sum += (building_cell.i + p.i);
-            sum += (building_cell.j + p.j);
+            sum += building_cell.i;
+            sum += building_cell.j;
         }
 
         Iterator<Cell> itr = waters.iterator();
@@ -221,8 +203,8 @@ public class Player implements pentos.sim.Player {
             sum += c.j;
         }
 
-        itr= parks.iterator();
-        while(itr.hasNext()){
+        itr = parks.iterator();
+        while( itr.hasNext() ){
             Cell c = itr.next();
             sum += c.i;
             sum += c.j;
@@ -232,15 +214,15 @@ public class Player implements pentos.sim.Player {
 
 
 
-    private void checkOptimal(Land land, Building b, Move m, Cell p, Set<Cell> waters, Set<Cell> parks, Building request, int ri){      
+    private void checkOptimal(Land land, Set<Cell> b, Move m, Cell p, Set<Cell> waters, Set<Cell> parks, Building request, int ri){      
         int sum = calcSum(b,p,waters,parks);
         boolean isFactory = request.type == Building.Type.FACTORY;
         if(!isFactory){
-            sum +=  buildingToSet(b,p).size() * waters.size();
-            sum += buildingToSet(b,p).size() * parks.size();
+            sum +=  b.size() * waters.size() * 2;
+            sum += b.size() * parks.size() * 2;
         }
         if ( (!isFactory && sum <= min) || (isFactory && sum >= max) ) {
-            Set<Cell> new_roads = findShortestRoad(buildingToSet(b,p),land,waters,new HashSet<Cell>());
+            Set<Cell> new_roads = findShortest(b,land,waters,parks,new HashSet<Cell>(),Type.ROAD,land.side);
             if(new_roads == null){
                 return;
             }
@@ -257,11 +239,7 @@ public class Player implements pentos.sim.Player {
     }
 
     //convert cell b into absolute coordinates
-    private Cell convert(Cell b,Cell p){
-        //System.out.println("b.i: " + b.i);
-        //System.out.println("b.j: " + b.j);
-        //System.out.println("p.i: " + p.i);
-        //System.out.println("p.j: " + p.j);
-        return new Cell(b.i+p.i,b.j+p.j);
+    private Cell convert(Cell c,Cell p){
+        return new Cell(c.i+p.i,c.j+p.j);
     }
 }

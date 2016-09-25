@@ -13,7 +13,7 @@ public class Player implements pentos.sim.Player {
     private Set<Cell> road_cells = new HashSet<Cell>();
 
     public void init() { // function is called once at the beginning before play is called
-	gen = new Random();
+	gen = new Random(1);
     }
     
     public Move play(Building request, Land land) {
