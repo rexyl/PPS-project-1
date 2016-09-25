@@ -51,6 +51,7 @@ public class Player implements pentos.sim.Player {
         System.out.println();
         System.out.println("play started");
         System.out.println("request: " + request.toString());
+        ArrayList<Move> possibleMoves = new ArrayList<Move>();
         this.min = Integer.MAX_VALUE;
         this.max = Integer.MIN_VALUE;
         for (int i = 0 ; i < land.side ; i++){
@@ -61,10 +62,14 @@ public class Player implements pentos.sim.Player {
                     Building b = rotations[ri];
                     if (land.buildable(b, p)){
                         search(m,buildingToSet(b,p),land,p,ri,request);
+                        if(m.accept){
+                            possibleMoves.add(m);
+                        }
                     }
                 }
             }
         }
+
         if(m.accept){
             road_cells.addAll(m.road);
             water_cells.addAll(m.water);
@@ -72,6 +77,19 @@ public class Player implements pentos.sim.Player {
             //print(m);
         } 
         return m;
+    }
+
+    //score the move
+    private Move scoreMove(ArrayList<Move> possibleMoves){
+        Move bestMove = null;
+        int highestScore = Integer.MIN_VALUE, int cur_score;
+        for (Move m : possibleMoves) {
+            cur_score = calcSum(buildingToSet(m.request.rotations[m.rotation], m.location), m.location,m.waters,m.parks);
+            if (cur_score > highestScore) {
+                bestMove = m;
+                highestScore = cur_score;
+            }
+        }
     }
 
     //return abosulte coordinates of a building in cell
