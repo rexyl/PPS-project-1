@@ -16,12 +16,20 @@ public class Player implements pentos.sim.Player {
     private int min;
     private int max;
     public enum Type {PARK, WATER, ROAD};
+    private int factory_up;
+    private int factory_left;
+    private int residence_down;
+    private int residence_right;
 
     public void init() { // function is called once at the beginning before play is called
         this.gen = new Random();
         this.road_cells = new HashSet<Cell>();
         this.water_cells = new HashSet<Cell>();
         this.park_cells = new HashSet<Cell>();
+        this.factory_up = 49-5;
+        this.factory_left = 49-5;
+        this.residence_down = 0;
+        this.residence_right = 0;
     }
 
     public void print(Move m){
@@ -48,14 +56,17 @@ public class Player implements pentos.sim.Player {
     public Move play(Building request, Land land) {
         // find all valid building locations and orientations
         Move m = new Move(false);
-        System.out.println();
-        System.out.println("play started");
-        System.out.println("request: " + request.toString());
+        // System.out.println();
+        // System.out.println("play started");
+        //System.out.println("request: " + request.toString());
         ArrayList<Move> possibleMoves = new ArrayList<Move>();
         this.min = Integer.MAX_VALUE;
         this.max = Integer.MIN_VALUE;
+        boolean isFactory = request.type == Building.Type.FACTORY;
         for (int i = 0 ; i < land.side ; i++){
             for (int j = 0 ; j < land.side ; j++) {
+                if (!isBounded(i,j,isFactory))
+                    continue;
                 Cell p = new Cell(i, j);
                 Building[] rotations = request.rotations();
                 for (int ri = 0 ; ri < rotations.length ; ri++) {
@@ -75,21 +86,64 @@ public class Player implements pentos.sim.Player {
             water_cells.addAll(m.water);
             park_cells.addAll(m.park);
             //print(m);
+            updateBoundary(m,isFactory);
         } 
         return m;
+    }
+
+    private boolean isBounded(int i, int j, boolean isFactory){
+        if (isFactory && i >= factory_up && j >= factory_left) {
+            return true;
+        } else if(!isFactory && i <= residence_down && j<= residence_right){
+            return true;
+        }
+        return false;
+    }
+
+    private void updateBoundary(Move m, boolean isFactory){
+        if (isFactory) {
+            int up_most = Integer.MAX_VALUE, left_most = Integer.MAX_VALUE;
+            for (Cell building_cell: buildingToSet(m.request.rotations()[m.rotation], m.location)) {
+                up_most = Math.min(up_most, building_cell.i);
+                left_most = Math.min(left_most, building_cell.j);
+            }
+            up_most -= 5;
+            left_most -=5;
+            factory_up = Math.min(factory_up, up_most);
+            factory_left = Math.min(factory_left,left_most);
+        } else{
+            int down_most = Integer.MIN_VALUE, right_most = Integer.MIN_VALUE;
+            for (Cell building_cell: buildingToSet(m.request.rotations()[m.rotation], m.location)) {
+                down_most = Math.max(down_most, building_cell.i);
+                right_most = Math.max(right_most, building_cell.j);
+            }
+            for (Cell building_cell: m.water) {
+                down_most = Math.max(down_most, building_cell.i);
+                right_most = Math.max(right_most, building_cell.j);
+            }
+            for (Cell building_cell: m.park) {
+                down_most = Math.max(down_most, building_cell.i);
+                right_most = Math.max(right_most, building_cell.j);
+            }
+            down_most += 5;
+            right_most += 5;
+            residence_right = Math.max(residence_right,right_most);
+            residence_down = Math.max(residence_down,down_most);
+        }
     }
 
     //score the move
     private Move scoreMove(ArrayList<Move> possibleMoves){
         Move bestMove = null;
-        int highestScore = Integer.MIN_VALUE, int cur_score;
+        int highestScore = Integer.MIN_VALUE, cur_score;
         for (Move m : possibleMoves) {
-            cur_score = calcSum(buildingToSet(m.request.rotations[m.rotation], m.location), m.location,m.waters,m.parks);
+            cur_score = calcSum(buildingToSet(m.request.rotations()[m.rotation], m.location), m.location,m.water,m.park);
             if (cur_score > highestScore) {
                 bestMove = m;
                 highestScore = cur_score;
             }
         }
+        return bestMove;
     }
 
     //return abosulte coordinates of a building in cell
@@ -207,7 +261,7 @@ public class Player implements pentos.sim.Player {
     }
 
 
-     private int calcSum(Set<Cell> b, Cell p,Set<Cell> waters,Set<Cell> parks){
+    private int calcSum(Set<Cell> b, Cell p,Set<Cell> waters,Set<Cell> parks){
         int sum = 0;
         for(Cell building_cell:b){
             sum += building_cell.i;
