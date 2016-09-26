@@ -55,10 +55,6 @@ public class Player implements pentos.sim.Player {
     
     public Move play(Building request, Land land) {
         // find all valid building locations and orientations
-        Move m = new Move(false);
-        // System.out.println();
-        // System.out.println("play started");
-        //System.out.println("request: " + request.toString());
         ArrayList<Move> possibleMoves = new ArrayList<Move>();
         this.min = Integer.MAX_VALUE;
         this.max = Integer.MIN_VALUE;
@@ -66,29 +62,29 @@ public class Player implements pentos.sim.Player {
         for (int i = 0 ; i < land.side ; i++){
             for (int j = 0 ; j < land.side ; j++) {
                 if (!isBounded(i,j,isFactory))
-                    continue;
+                   continue;
                 Cell p = new Cell(i, j);
                 Building[] rotations = request.rotations();
                 for (int ri = 0 ; ri < rotations.length ; ri++) {
                     Building b = rotations[ri];
                     if (land.buildable(b, p)){
-                        search(m,buildingToSet(b,p),land,p,ri,request);
-                        if(m.accept){
-                            possibleMoves.add(m);
+                        Move temp_m = search(buildingToSet(b,p),land,p,ri,request);
+                        if(temp_m.accept){
+                            possibleMoves.add(temp_m);
                         }
                     }
                 }
             }
         }
-
-        if(m.accept){
-            road_cells.addAll(m.road);
-            water_cells.addAll(m.water);
-            park_cells.addAll(m.park);
+        Move move = scoreMove(possibleMoves, isFactory);
+        if(move.accept){
+            road_cells.addAll(move.road);
+            water_cells.addAll(move.water);
+            park_cells.addAll(move.park);
             //print(m);
-            updateBoundary(m,isFactory);
-        } 
-        return m;
+            updateBoundary(move, isFactory);
+        }
+        return move;
     }
 
     private boolean isBounded(int i, int j, boolean isFactory){
@@ -133,11 +129,13 @@ public class Player implements pentos.sim.Player {
     }
 
     //score the move
-    private Move scoreMove(ArrayList<Move> possibleMoves){
-        Move bestMove = null;
+    private Move scoreMove(ArrayList<Move> possibleMoves, boolean isFactory){
+        Move bestMove = new Move(false);
         int highestScore = Integer.MIN_VALUE, cur_score;
         for (Move m : possibleMoves) {
-            cur_score = calcSum(buildingToSet(m.request.rotations()[m.rotation], m.location), m.location,m.water,m.park);
+            //System.out.println("location: " + m.location.toString());
+            cur_score = calcSum(m);
+            if (!isFactory) cur_score = -cur_score;
             if (cur_score > highestScore) {
                 bestMove = m;
                 highestScore = cur_score;
@@ -156,7 +154,8 @@ public class Player implements pentos.sim.Player {
         return b;
     }
 
-    private void search(Move m,Set<Cell> b, Land land, Cell p, int ri, Building request){
+    private Move search(Set<Cell> b, Land land, Cell p, int ri, Building request){
+        Move m = new Move(false);
         Set<Cell> waters = new HashSet<Cell>();
         Set<Cell> parks = new HashSet<Cell>();
         if(request.type == Building.Type.RESIDENCE) {
@@ -165,7 +164,20 @@ public class Player implements pentos.sim.Player {
             parks = findShortest(b,land,waters,parks,new HashSet<Cell>(),Type.PARK,4);
             if(parks == null) parks = new HashSet<Cell>();
         }
-        checkOptimal(land, b, m, p, waters, parks, request, ri);
+        Set<Cell> new_roads = findShortest(b,land,waters,parks,new HashSet<Cell>(),Type.ROAD,land.side);
+        if(new_roads == null){
+            m.accept = false;
+            return m;
+        }
+        m.road = new_roads;
+        m.accept = true;
+        m.location = p;
+        m.request = request;
+        m.water = new HashSet<Cell>(waters);
+        m.park = new HashSet<Cell>(parks);
+        m.rotation = ri;
+        return m;
+        //checkOptimal(land, b, m, p, waters, parks, request, ri);
     }
     
     private boolean hitSide(Cell b,int side){
@@ -219,8 +231,6 @@ public class Player implements pentos.sim.Player {
             }
         }
 
-        //System.out.println("queue size before: " + queue.size() );
-        //System.out.println("there");
         Cell end = null;
         Cell marker = new Cell(side+1,side+1);
         queue.offer(marker);
@@ -260,54 +270,27 @@ public class Player implements pentos.sim.Player {
         return output;
     }
 
-
-    private int calcSum(Set<Cell> b, Cell p,Set<Cell> waters,Set<Cell> parks){
+    private int calcSum(Move m){
         int sum = 0;
-        for(Cell building_cell:b){
+        for(Cell building_cell : buildingToSet(m.request.rotations()[m.rotation], m.location) ){
             sum += building_cell.i;
             sum += building_cell.j;
         }
 
-        Iterator<Cell> itr = waters.iterator();
+        Iterator<Cell> itr = m.water.iterator();
         while(itr.hasNext()){
             Cell c = itr.next();
             sum += c.i;
             sum += c.j;
         }
 
-        itr = parks.iterator();
+        itr = m.park.iterator();
         while( itr.hasNext() ){
             Cell c = itr.next();
             sum += c.i;
             sum += c.j;
         }
         return sum;
-    }
-
-
-
-    private void checkOptimal(Land land, Set<Cell> b, Move m, Cell p, Set<Cell> waters, Set<Cell> parks, Building request, int ri){      
-        int sum = calcSum(b,p,waters,parks);
-        boolean isFactory = request.type == Building.Type.FACTORY;
-        if(!isFactory){
-            sum +=  b.size() * waters.size() * 2;
-            sum += b.size() * parks.size() * 2;
-        }
-        if ( (!isFactory && sum <= min) || (isFactory && sum >= max) ) {
-            Set<Cell> new_roads = findShortest(b,land,waters,parks,new HashSet<Cell>(),Type.ROAD,land.side);
-            if(new_roads == null){
-                return;
-            }
-            m.road = new_roads;
-            m.accept = true;
-            m.location = p;
-            m.request = request;
-            m.water = new HashSet<Cell>(waters);
-            m.park = new HashSet<Cell>(parks);
-            m.rotation = ri;
-            if(!isFactory) min = sum;
-            else max = sum;
-        }
     }
 
     //convert cell b into absolute coordinates
