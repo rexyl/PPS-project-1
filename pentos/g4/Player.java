@@ -13,23 +13,17 @@ public class Player implements pentos.sim.Player {
     private Set<Cell> road_cells;
     private Set<Cell> water_cells;
     private Set<Cell> park_cells;
+    private Set<Cell> prev_cells;
     private int min;
     private int max;
     public enum Type {PARK, WATER, ROAD};
-    private int factory_up;
-    private int factory_left;
-    private int residence_down;
-    private int residence_right;
 
     public void init() { // function is called once at the beginning before play is called
         this.gen = new Random();
         this.road_cells = new HashSet<Cell>();
         this.water_cells = new HashSet<Cell>();
         this.park_cells = new HashSet<Cell>();
-        this.factory_up = 49-5;
-        this.factory_left = 49-5;
-        this.residence_down = 0;
-        this.residence_right = 0;
+        this.prev_cells = new HashSet<Cell>();
     }
 
     public void print(Move m){
@@ -54,6 +48,18 @@ public class Player implements pentos.sim.Player {
     }
     
     public Move play(Building request, Land land) {
+        if(prev_cells.size() == 0){
+            for(int i  = 0; i < land.side; i++){
+                prev_cells.add(new Cell(0,i));
+                prev_cells.add(new Cell(land.side-1,i));
+            }
+            for(int j  =0; j < land.side; j++){
+                prev_cells.add(new Cell(j,0));
+                prev_cells.add(new Cell(j,land.side-1));
+            }
+
+        }
+
         // find all valid building locations and orientations
         ArrayList<Move> possibleMoves = new ArrayList<Move>();
         this.min = Integer.MAX_VALUE;
@@ -61,13 +67,11 @@ public class Player implements pentos.sim.Player {
         boolean isFactory = request.type == Building.Type.FACTORY;
         for (int i = 0 ; i < land.side ; i++){
             for (int j = 0 ; j < land.side ; j++) {
-                if (!isBounded(i,j,isFactory))
-                   continue;
                 Cell p = new Cell(i, j);
                 Building[] rotations = request.rotations();
                 for (int ri = 0 ; ri < rotations.length ; ri++) {
                     Building b = rotations[ri];
-                    if (land.buildable(b, p)){
+                    if (land.buildable(b, p) && isBounded(buildingToSet(b,p)) ){
                         Move temp_m = search(buildingToSet(b,p),land,p,ri,request);
                         if(temp_m.accept){
                             possibleMoves.add(temp_m);
@@ -76,70 +80,62 @@ public class Player implements pentos.sim.Player {
                 }
             }
         }
-        Move move = scoreMove(possibleMoves, isFactory);
+        Move move = scoreMove(possibleMoves, isFactory, land);
         if(move.accept){
             road_cells.addAll(move.road);
             water_cells.addAll(move.water);
             park_cells.addAll(move.park);
-            //print(m);
-            updateBoundary(move, isFactory);
+            updateBoundary(move);
         }
         return move;
     }
 
-    private boolean isBounded(int i, int j, boolean isFactory){
-        if (isFactory && i >= factory_up && j >= factory_left) {
-            return true;
-        } else if(!isFactory && i <= residence_down && j<= residence_right){
-            return true;
+    private boolean isBounded(Set<Cell> b){
+        //return true;
+        
+        for(Cell building_cell:b){
+            for(Cell n:building_cell.neighbors()){
+                if(prev_cells.contains(n)){
+                    return true;
+                }
+            }
         }
         return false;
+        
     }
 
-    private void updateBoundary(Move m, boolean isFactory){
-        if (isFactory) {
-            int up_most = Integer.MAX_VALUE, left_most = Integer.MAX_VALUE;
-            for (Cell building_cell: buildingToSet(m.request.rotations()[m.rotation], m.location)) {
-                up_most = Math.min(up_most, building_cell.i);
-                left_most = Math.min(left_most, building_cell.j);
-            }
-            up_most -= 5;
-            left_most -=5;
-            factory_up = Math.min(factory_up, up_most);
-            factory_left = Math.min(factory_left,left_most);
-        } else{
-            int down_most = Integer.MIN_VALUE, right_most = Integer.MIN_VALUE;
-            for (Cell building_cell: buildingToSet(m.request.rotations()[m.rotation], m.location)) {
-                down_most = Math.max(down_most, building_cell.i);
-                right_most = Math.max(right_most, building_cell.j);
-            }
-            for (Cell building_cell: m.water) {
-                down_most = Math.max(down_most, building_cell.i);
-                right_most = Math.max(right_most, building_cell.j);
-            }
-            for (Cell building_cell: m.park) {
-                down_most = Math.max(down_most, building_cell.i);
-                right_most = Math.max(right_most, building_cell.j);
-            }
-            down_most += 5;
-            right_most += 5;
-            residence_right = Math.max(residence_right,right_most);
-            residence_down = Math.max(residence_down,down_most);
-        }
+    private void updateBoundary(Move m){
+        prev_cells.addAll(buildingToSet(m.request.rotations()[m.rotation], m.location) );
+        prev_cells.addAll(m.water);
+        prev_cells.addAll(m.park);
+        prev_cells.addAll(m.road);
     }
 
     //score the move
-    private Move scoreMove(ArrayList<Move> possibleMoves, boolean isFactory){
+    private Move scoreMove(ArrayList<Move> possibleMoves, boolean isFactory, Land land){
         Move bestMove = new Move(false);
-        int highestScore = Integer.MIN_VALUE, cur_score;
+        int highestPerimeter = Integer.MIN_VALUE;
+        int highest_ij = Integer.MIN_VALUE;
+        int cur_Perimeter = highestPerimeter;
+        int cur_ij = highest_ij;
+
         for (Move m : possibleMoves) {
             //System.out.println("location: " + m.location.toString());
-            cur_score = calcSum(m);
-            if (!isFactory) cur_score = -cur_score;
-            if (cur_score > highestScore) {
+            cur_Perimeter = calcPerimeter(m,land);
+            cur_ij = calcIJ(m,land);
+            if(isFactory) cur_ij = -cur_ij;
+            if (cur_ij > highest_ij){//|| (cur_ij == highest_ij &&
+                //cur_Perimeter > highestPerimeter)) {
                 bestMove = m;
-                highestScore = cur_score;
             }
+            /*
+            if (cur_Perimeter > highestPerimeter || (cur_Perimeter == highestPerimeter &&
+                cur_ij > highest_ij)) {
+                bestMove = m;
+            }
+            */
+            highestPerimeter = Math.max(highestPerimeter,cur_Perimeter);
+            highest_ij = Math.max(highest_ij,cur_ij);
         }
         return bestMove;
     }
@@ -158,12 +154,16 @@ public class Player implements pentos.sim.Player {
         Move m = new Move(false);
         Set<Cell> waters = new HashSet<Cell>();
         Set<Cell> parks = new HashSet<Cell>();
+        
+        
         if(request.type == Building.Type.RESIDENCE) {
             waters = findShortest(b,land,new HashSet<Cell>(),new HashSet<Cell>(),new HashSet<Cell>(),Type.WATER,4);
             if(waters == null) waters = new HashSet<Cell>();
-            parks = findShortest(b,land,waters,parks,new HashSet<Cell>(),Type.PARK,4);
-            if(parks == null) parks = new HashSet<Cell>();
+            //parks = findShortest(b,land,waters,parks,new HashSet<Cell>(),Type.PARK,4);
+            //if(parks == null) parks = new HashSet<Cell>();
         }
+        
+        
         Set<Cell> new_roads = findShortest(b,land,waters,parks,new HashSet<Cell>(),Type.ROAD,land.side);
         if(new_roads == null){
             m.accept = false;
@@ -211,25 +211,30 @@ public class Player implements pentos.sim.Player {
         return false;
     }
 
-
-
     private Set<Cell> findShortest(Set<Cell> building, Land land, Set<Cell> waters, Set<Cell> parks, Set<Cell> roads,
         Type type, int depth){
         boolean[][] checked = new boolean[land.side][land.side];
         Queue<Cell> queue = new LinkedList<Cell>();
         int side = land.side;
+        List<Cell> starts = new ArrayList<Cell>();
         for(Cell b:building){
             //if building is direct neighbor to targets, return empty set;
             if(hitTarget(b,type,side)) return new HashSet<Cell>();
-            for(Cell start:b.neighbors()){
+            Cell[] neighbors = b.neighbors();
+            //perimeter_sort(neighbors,land,building);
+            for(Cell start:neighbors){
                 //else push all direct neighbor of building to queue
                 if(land.unoccupied(start) && !building.contains(start) && !waters.contains(start)
                     && !parks.contains(start) && !roads.contains(start)){
-                    queue.offer(start);
+                    starts.add(start);
                     //System.out.println("start");
                 }
             }
         }
+
+        Cell[] s = (Cell[])starts.toArray(new Cell[0]);
+        perimeter_sort(s,land,building);
+        for(Cell c:s) queue.offer(c);
 
         Cell end = null;
         Cell marker = new Cell(side+1,side+1);
@@ -246,7 +251,9 @@ public class Player implements pentos.sim.Player {
                 if(!queue.isEmpty()) queue.offer(marker);
             }
             else{
-                for(Cell n : curr.neighbors()) { 
+                Cell[] neighbors = curr.neighbors();
+                perimeter_sort(neighbors,land,building);
+                for(Cell n : neighbors) { 
                     if(!checked[n.i][n.j]){
                         checked[n.i][n.j] = true;
                         n.previous = curr;            
@@ -270,31 +277,88 @@ public class Player implements pentos.sim.Player {
         return output;
     }
 
-    private int calcSum(Move m){
+    //return how many of c's neighbors are occupied
+    private int count_neighbor(Cell c, Land land, Set<Cell> b){
+        int res = 0;
+        for(Cell n:c.neighbors()){
+            if(!land.unoccupied(n) || b.contains(n)) res++;
+        }
+        if(c.i == 0 || c.i == land.side) res++;
+        if(c.j == 0 || c.j == land.side) res++;
+        return res;
+    }
+
+    private int calcPerimeter(Move m, Land land){
+        int sum = 0;
+        Set<Cell> b = buildingToSet(m.request.rotations()[m.rotation], m.location);
+        for(Cell building_cell : b){
+            sum += count_neighbor(building_cell,land,new HashSet<Cell>());
+        }
+
+        for(Cell w:m.water){
+            sum += count_neighbor(w,land,b);
+        }
+
+        for(Cell p:m.park){
+            sum += count_neighbor(p,land,b);
+        }
+        return sum;
+    }
+
+    private int calcIJ(Move m, Land land){
         int sum = 0;
         for(Cell building_cell : buildingToSet(m.request.rotations()[m.rotation], m.location) ){
             sum += building_cell.i;
             sum += building_cell.j;
         }
-
-        Iterator<Cell> itr = m.water.iterator();
-        while(itr.hasNext()){
-            Cell c = itr.next();
-            sum += c.i;
-            sum += c.j;
+        /*
+        for(Cell w:m.water){
+            sum += w.i;
+            sum += w.j;
         }
 
-        itr = m.park.iterator();
-        while( itr.hasNext() ){
-            Cell c = itr.next();
-            sum += c.i;
-            sum += c.j;
+        for(Cell p:m.park){
+            sum += p.i;
+            sum += p.j;
         }
+
+        /*
+        for(Cell r:m.road){
+            sum += r.i;
+            sum += r.j;
+        }
+        */
         return sum;
     }
 
     //convert cell b into absolute coordinates
     private Cell convert(Cell c,Cell p){
         return new Cell(c.i+p.i,c.j+p.j);
+    }
+
+
+    private void perimeter_sort(Cell[] neighbors,Land land,Set<Cell> b){
+        Cell[] copy = Arrays.copyOf(neighbors,neighbors.length);
+        boolean[] marked = new boolean[neighbors.length];
+        for(int i = 0; i < copy.length; i++){
+            int max = Integer.MIN_VALUE;
+            int m = -1;
+            for(int j = 0; j < copy.length; j++){
+                if(marked[j]) continue;
+                if(count_neighbor(copy[j],land,b) > max){
+                    max = count_neighbor(copy[j],land,b);
+                    m = j;
+                }
+            }
+            marked[m] = true;
+            neighbors[i] = copy[m];
+        }
+        /*
+        for(Cell n:neighbors){
+            System.out.print(count_neighbor(n,land,b) + ",");
+        }
+        System.out.println();
+        System.out.println("========================");
+        */
     }
 }
