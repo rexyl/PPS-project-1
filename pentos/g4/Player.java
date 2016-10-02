@@ -72,9 +72,9 @@ public class Player implements pentos.sim.Player {
                 for (int ri = 0 ; ri < rotations.length ; ri++) {
                     Building b = rotations[ri];
                     if (land.buildable(b, p) && isBounded(buildingToSet(b,p)) ){
-                        Move temp_m = search(buildingToSet(b,p),land,p,ri,request);
-                        if(temp_m.accept){
-                            possibleMoves.add(temp_m);
+                        Move temp_m1 = search(buildingToSet(b,p),land,p,ri,request,true);
+                        if(temp_m1.accept){
+                            possibleMoves.add(temp_m1);
                         }
                     }
                 }
@@ -124,16 +124,20 @@ public class Player implements pentos.sim.Player {
             cur_Perimeter = calcPerimeter(m,land);
             cur_ij = calcIJ(m,land);
             if(isFactory) cur_ij = -cur_ij;
-            if (cur_ij > highest_ij){//|| (cur_ij == highest_ij &&
-                //cur_Perimeter > highestPerimeter)) {
+            
+            
+            if (cur_ij > highest_ij) {
                 bestMove = m;
             }
+            
+            
             /*
-            if (cur_Perimeter > highestPerimeter || (cur_Perimeter == highestPerimeter &&
+            if (cur_Perimeter > highestPerimeter || (true &&
                 cur_ij > highest_ij)) {
                 bestMove = m;
             }
             */
+            
             highestPerimeter = Math.max(highestPerimeter,cur_Perimeter);
             highest_ij = Math.max(highest_ij,cur_ij);
         }
@@ -150,15 +154,33 @@ public class Player implements pentos.sim.Player {
         return b;
     }
 
-    private Move search(Set<Cell> b, Land land, Cell p, int ri, Building request){
+    private Move search(Set<Cell> b, Land land, Cell p, int ri, Building request, boolean no_water){
         Move m = new Move(false);
         Set<Cell> waters = new HashSet<Cell>();
         Set<Cell> parks = new HashSet<Cell>();
         
         
-        if(request.type == Building.Type.RESIDENCE) {
-            waters = findShortest(b,land,new HashSet<Cell>(),new HashSet<Cell>(),new HashSet<Cell>(),Type.WATER,4);
-            if(waters == null) waters = new HashSet<Cell>();
+        if(request.type == Building.Type.RESIDENCE && !no_water) {
+            waters = findShortest(b,land,new HashSet<Cell>(),new HashSet<Cell>(),new HashSet<Cell>(),Type.WATER,2);
+            
+            //random walk 200 times
+            if(waters == null){
+                int best_perimeter = Integer.MIN_VALUE;
+                Set<Cell> best_water = new HashSet<Cell>();
+                for(int i = 0; i < 100; i++){
+                    Set<Cell> tmp = randomWalk(b,new HashSet<Cell>(),land,4);
+                    Move t = new Move(false);
+                    t.request = request;
+                    t.location = p;
+                    t.water = tmp;
+                    t.park = new HashSet<Cell>();
+                    if(calcPerimeter(t,land) > best_perimeter){
+                        best_water = tmp;
+                    }
+                    best_perimeter = Math.max(best_perimeter,calcPerimeter(t,land));
+                }
+                waters = best_water;
+            } 
             //parks = findShortest(b,land,waters,parks,new HashSet<Cell>(),Type.PARK,4);
             //if(parks == null) parks = new HashSet<Cell>();
         }
@@ -242,8 +264,10 @@ public class Player implements pentos.sim.Player {
         int level = 1;
         while (!queue.isEmpty()){
             Cell curr = queue.poll();
-            if(hitTarget(curr,type,side) || level>=depth){
+            //if(!curr.equals(marker)) checked[curr.i][curr.j] = true;
+            if(hitTarget(curr,type,side) || level == depth){
                 end = curr;
+                if(depth < 4) end = null;
                 break;
             }
             else if(curr.equals(marker)){
@@ -253,16 +277,17 @@ public class Player implements pentos.sim.Player {
             else{
                 Cell[] neighbors = curr.neighbors();
                 perimeter_sort(neighbors,land,building);
-                for(Cell n : neighbors) { 
+                for(Cell n:neighbors) { 
                     if(!checked[n.i][n.j]){
-                        checked[n.i][n.j] = true;
-                        n.previous = curr;            
+                        n.previous = curr;  
+                        checked[n.i][n.j] = true;          
                         if (land.unoccupied(n) && !building.contains(n) && !waters.contains(n) && !parks.contains(n) && !roads.contains(n)) {
                             queue.offer(n);
                         }
                     }
                 }
             }
+            
         }
         //System.out.println("level: " + level);
         if(end==null){
@@ -278,7 +303,7 @@ public class Player implements pentos.sim.Player {
     }
 
     //return how many of c's neighbors are occupied
-    private int count_neighbor(Cell c, Land land, Set<Cell> b){
+    private int count_occupied_neighbors(Cell c, Land land, Set<Cell> b){
         int res = 0;
         for(Cell n:c.neighbors()){
             if(!land.unoccupied(n) || b.contains(n)) res++;
@@ -292,18 +317,19 @@ public class Player implements pentos.sim.Player {
         int sum = 0;
         Set<Cell> b = buildingToSet(m.request.rotations()[m.rotation], m.location);
         for(Cell building_cell : b){
-            sum += count_neighbor(building_cell,land,new HashSet<Cell>());
+            sum += count_occupied_neighbors(building_cell,land,new HashSet<Cell>());
         }
 
         for(Cell w:m.water){
-            sum += count_neighbor(w,land,b);
+            sum += count_occupied_neighbors(w,land,b);
         }
 
         for(Cell p:m.park){
-            sum += count_neighbor(p,land,b);
+            sum += count_occupied_neighbors(p,land,b);
         }
         return sum;
     }
+
 
     private int calcIJ(Move m, Land land){
         int sum = 0;
@@ -311,23 +337,6 @@ public class Player implements pentos.sim.Player {
             sum += building_cell.i;
             sum += building_cell.j;
         }
-        /*
-        for(Cell w:m.water){
-            sum += w.i;
-            sum += w.j;
-        }
-
-        for(Cell p:m.park){
-            sum += p.i;
-            sum += p.j;
-        }
-
-        /*
-        for(Cell r:m.road){
-            sum += r.i;
-            sum += r.j;
-        }
-        */
         return sum;
     }
 
@@ -345,8 +354,8 @@ public class Player implements pentos.sim.Player {
             int m = -1;
             for(int j = 0; j < copy.length; j++){
                 if(marked[j]) continue;
-                if(count_neighbor(copy[j],land,b) > max){
-                    max = count_neighbor(copy[j],land,b);
+                if(count_occupied_neighbors(copy[j],land,b) > max){
+                    max = count_occupied_neighbors(copy[j],land,b);
                     m = j;
                 }
             }
@@ -355,10 +364,41 @@ public class Player implements pentos.sim.Player {
         }
         /*
         for(Cell n:neighbors){
-            System.out.print(count_neighbor(n,land,b) + ",");
+            System.out.print(count_occupied_neighbors(n,land,b) + ",");
         }
         System.out.println();
         System.out.println("========================");
         */
+    }
+
+    // walk n consecutive cells starting from a building. Used to build a random field or pond. 
+    private Set<Cell> randomWalk(Set<Cell> b, Set<Cell> marked, Land land, int n) {
+    ArrayList<Cell> adjCells = new ArrayList<Cell>();
+    Set<Cell> output = new HashSet<Cell>();
+    for (Cell p : b) {
+        for (Cell q : p.neighbors()) {
+        if (land.isField(q) || land.isPond(q))
+            return new HashSet<Cell>();
+        if (!b.contains(q) && !marked.contains(q) && land.unoccupied(q))
+            adjCells.add(q); 
+        }
+    }
+    if (adjCells.isEmpty())
+        return new HashSet<Cell>();
+    Cell tail = adjCells.get(gen.nextInt(adjCells.size()));
+    for (int ii=0; ii<n; ii++) {
+        ArrayList<Cell> walk_cells = new ArrayList<Cell>();
+        for (Cell p : tail.neighbors()) {
+        if (!b.contains(p) && !marked.contains(p) && land.unoccupied(p) && !output.contains(p))
+            walk_cells.add(p);      
+        }
+        if (walk_cells.isEmpty()) {
+        //return output; //if you want to build it anyway
+        return new HashSet<Cell>();
+        }
+        output.add(tail);       
+        tail = walk_cells.get(gen.nextInt(walk_cells.size()));
+    }
+    return output;
     }
 }
