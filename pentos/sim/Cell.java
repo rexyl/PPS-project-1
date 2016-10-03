@@ -35,6 +35,7 @@ public class Cell implements Comparable <Cell> {
     public boolean isWater() {return (type == Type.WATER); }
     public boolean isPark() { return (type == Type.PARK); }
     public boolean isFactory() { return (type == Type.FACTORY); }
+    public boolean isResidence() { return (type == Type.RESIDENCE);}
 
     public Cell[] neighbors() {
 	return neighbors(default_land_side);

@@ -8,6 +8,8 @@ public class Land {
     protected Set<Cell> road_network; // used internally to check road validity
     public final int side;
 
+    public Cell.Type getCellType(int i, int j) {return land[i][j].type;}
+    
     // create new Land
     public Land(int side) {
 	if (side <= 0)
