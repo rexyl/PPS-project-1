@@ -9,6 +9,7 @@ import pentos.sim.Land;
 import pentos.sim.Move;
 
 public class Player implements pentos.sim.Player {
+
      //                        empty residence factory p/w side  road  firstroad  firstpark/first water
     private int[] factory_to = {0,   -10,       2,      0,   0,    1,         5};
     private int[] residence_to = {0,    5,        -10,    1,   0,    1,         8,                 10};
@@ -57,7 +58,7 @@ public class Player implements pentos.sim.Player {
             // ex.printStackTrace();
         }
     }
-    
+
     public Move getBestMove(Building request, Land land) {
         Building[] rotations = request.rotations();
         int best_i = land.side + 1,
@@ -141,6 +142,7 @@ public class Player implements pentos.sim.Player {
                     }               
                 }
             }
+
         //find closest free location to end
         } else if(request.type == Building.Type.FACTORY) {
             best_i = -1;
@@ -218,7 +220,16 @@ public class Player implements pentos.sim.Player {
                         }
                     }                   
                 }
+            }    
+            /*
+            if (cur_Perimeter > highestPerimeter || (true &&
+                cur_ij > highest_ij)) {
+                bestMove = m;
             }
+            */
+            
+            highestPerimeter = Math.max(highestPerimeter,cur_Perimeter);
+            highest_ij = Math.max(highest_ij,cur_ij);
         }
         return best_move;
     }
@@ -233,10 +244,6 @@ public class Player implements pentos.sim.Player {
         }
         // get coordinates of building placement (position plus local building cell coordinates)
         Set<Cell> shiftedCells = new HashSet<Cell>();
-        //System.out.println(request.type == request.type.RESIDENCE);
-        //System.out.println();
-
-//      System.out.println("building: ");
         for (Cell x : best_move.request.rotations()[best_move.rotation]) {
             shiftedCells.add(
                     new Cell(x.i+best_move.location.i,
@@ -432,5 +439,3 @@ public class Player implements pentos.sim.Player {
     }
     return output;
     }
-
-}
