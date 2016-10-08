@@ -128,8 +128,8 @@ public class Player implements pentos.sim.Player {
                     if(!disconnected && ((perimeter > best_perimeter)
                             ||(perimeter==best_perimeter && (i  + j) < best_i +  best_j)
                             || (perimeter==best_perimeter && (i  + j) ==  best_i + best_j) && Math.abs(i-j) < Math.abs(best_i - best_j))) {
-                        List<Set<Cell>> roadCells = findShortestRoad(shiftedCells, land);
-                        if(roadCells != null) {
+                        List<Set<Cell>> roadCells_list = findShortestRoad(shiftedCells, land);
+                        if(roadCells_list != null) {
                             best_move = temp;
                             best_i = i;
                             best_j = j;
@@ -206,8 +206,8 @@ public class Player implements pentos.sim.Player {
                     if(!disconnected && (perimeter > best_perimeter 
                             || (perimeter==best_perimeter && (i  + j) >  best_i + best_j))
                             ||(perimeter==best_perimeter && (i  + j) ==  best_i + best_j) && Math.abs(i-j) < Math.abs(best_i - best_j)) {
-                        List<Set<Cell>> roadCells = findShortestRoad(shiftedCells, land);
-                        if(roadCells != null) {
+                        List<Set<Cell>> roadCells_list = findShortestRoad(shiftedCells, land);
+                        if(roadCells_list != null) {
                             best_move = temp;
                             best_i = i;
                             best_j = j;
@@ -242,8 +242,9 @@ public class Player implements pentos.sim.Player {
         }
         // builda road to connect this building to perimeter
         List<Set<Cell>> roadCells_list = findShortestRoad(shiftedCells, land);
+        if(roadCells_list != null && roadCells_list.size() > 1) System.out.println("size: " + roadCells_list.size());
         if (roadCells_list != null) {
-            int best_perimeter_road = Integer.MAX_VALUE;
+            int best_perimeter_road = Integer.MIN_VALUE;
             Set<Cell> roadCells = new HashSet<Cell>();
             for (Set<Cell> road:roadCells_list) {
                 int perimeter = 0;
@@ -255,7 +256,7 @@ public class Player implements pentos.sim.Player {
                         //     perimeter+=2;
                         // }
                         if (t == Cell.Type.ROAD) {
-                            perimeter+=2;
+                            perimeter+=200;
                         }
                         // if (t == Cell.Type.RESIDENCE) {
                         //     perimeter+=2;
@@ -265,7 +266,7 @@ public class Player implements pentos.sim.Player {
                         // }
                     }
                 }
-                if (perimeter < best_perimeter_road) {
+                if (perimeter > best_perimeter_road) {
                     best_perimeter_road = perimeter;
                     roadCells = road;
                 }
@@ -375,6 +376,7 @@ public class Player implements pentos.sim.Player {
                 }
             }
         }
+
         for (int z=0; z<land.side; z++) {
             if (b.contains(new Cell(0,z)) || b.contains(new Cell(z,0)) || b.contains(new Cell(land.side-1,z)) || b.contains(new Cell(z,land.side-1))) //if already on border don't build any roads
             //return output;
@@ -389,13 +391,13 @@ public class Player implements pentos.sim.Player {
             queue.add(new Cell(land.side-1,z,source));
         }
         // add cells adjacent to current road cells
-        
         for (Cell p : road_cells) {
             for (Cell q : p.neighbors()) {
             if (!road_cells.contains(q) && land.unoccupied(q) && !b.contains(q)) 
                 queue.add(new Cell(q.i,q.j,p)); // use tail field of cell to keep track of previous road cell during the search
             }
         }   
+        
         int best_len = Integer.MAX_VALUE;
         boolean if_break = false;
         while (!queue.isEmpty()) {
@@ -426,6 +428,7 @@ public class Player implements pentos.sim.Player {
             }
             if(if_break) break;
         }
+
         if (res.size()==0 && queue.isEmpty())
             return null;
         else
