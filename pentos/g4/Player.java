@@ -265,7 +265,7 @@ public class Player implements pentos.sim.Player {
                         // }
                     }
                 }
-                if (perimeter < best_perimeter_road) {
+                if (perimeter > best_perimeter_road) {
                     best_perimeter_road = perimeter;
                     roadCells = road;
                 }
