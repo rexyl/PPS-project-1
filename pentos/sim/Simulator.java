@@ -167,7 +167,8 @@ class Simulator {
 	player.init();
 	if (log)
 	    System.err.println("Initializing sequencer...");
-	generator.init();
+	Long seed =  1L;
+	generator.init(seed);
 	if (log)
 	    System.err.println("Construction begins ...");
 	do {

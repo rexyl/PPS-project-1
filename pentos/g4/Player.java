@@ -66,6 +66,9 @@ public class Player implements pentos.sim.Player {
         int best_perimeter = -1;
         Move best_move = null;
         
+        
+
+
         //find first free location row by row
         if(request.type == Building.Type.RESIDENCE) {
             best_i = land.side + 1;
@@ -92,9 +95,17 @@ public class Player implements pentos.sim.Player {
                         disconnected |= 
                                 isDisconnected[x.i + temp.location.i][x.j + temp.location.j];
                     }
+                        
+
                     
+
+
+
+
+
                     int perimeter = 0;
                     boolean first_resident_or_wp = true;
+                    
                     for(Cell x : shiftedCells) {
                         for(Cell y : x.neighbors()) {
                             if (shiftedCells.contains(y)) {
@@ -121,8 +132,19 @@ public class Player implements pentos.sim.Player {
                             }
                         }
                         if(x.i == 0 || x.i == land.side - 1) perimeter+=2;
-                        if(x.j == 0 || x.j == land.side - 1) perimeter+=2;                      
+                        if(x.j == 0 || x.j == land.side - 1) perimeter+=2;     
+
+
                     }
+                    
+
+                    Set<Cell> neighbors_one = new HashSet<Cell>(shiftedCells);
+                    neighbors_one.addAll(getNeighbors(shiftedCells,land));
+                    Set<Cell> neighbors_two = getNeighbors(neighbors_one,land);
+                    for(Cell n:neighbors_two){
+                        if(land.getCellType(n.i,n.j) == Cell.Type.FACTORY) perimeter -= 10;
+                    }
+
                     // builda road to connect this building to perimeter
                     
                     if(!disconnected && ((perimeter > best_perimeter)
@@ -172,6 +194,7 @@ public class Player implements pentos.sim.Player {
                     
                     int perimeter = 0;
                     boolean first_factory = true;
+                    
                     for(Cell x : shiftedCells) {
                         for(Cell y : x.neighbors()) {
                             if (shiftedCells.contains(y)) {
@@ -202,6 +225,14 @@ public class Player implements pentos.sim.Player {
                         if(x.i == 0 || x.i == land.side - 1) perimeter+=2;
                         if(x.j == 0 || x.j == land.side - 1) perimeter+=2;                      
                     }
+
+                    Set<Cell> neighbors_one = new HashSet<Cell>(shiftedCells);
+                    neighbors_one.addAll(getNeighbors(shiftedCells,land));
+                    Set<Cell> neighbors_two = getNeighbors(neighbors_one,land);
+                    for(Cell n:neighbors_two){
+                        if(land.getCellType(n.i,n.j) == Cell.Type.RESIDENCE) perimeter -= 10;
+                    }
+                    
                     // builda road to connect this building to perimeter
                     if(!disconnected && (perimeter > best_perimeter 
                             || (perimeter==best_perimeter && (i  + j) >  best_i + best_j))
@@ -229,7 +260,7 @@ public class Player implements pentos.sim.Player {
     public Move play(Building request, Land land) {
         Move best_move = getBestMove(request, land);
         if (best_move == null) {
-            //System.out.println("no moves");
+            //`m.out.println("no moves");
             return new Move(false);
         }
         // get coordinates of building placement (position plus local building cell coordinates)
@@ -242,7 +273,6 @@ public class Player implements pentos.sim.Player {
         }
         // builda road to connect this building to perimeter
         List<Set<Cell>> roadCells_list = findShortestRoad(shiftedCells, land);
-        if(roadCells_list != null && roadCells_list.size() > 1) System.out.println("size: " + roadCells_list.size());
         if (roadCells_list != null) {
             int best_perimeter_road = Integer.MIN_VALUE;
             Set<Cell> roadCells = new HashSet<Cell>();
@@ -275,6 +305,10 @@ public class Player implements pentos.sim.Player {
             best_move.road = roadCells;
             road_cells.addAll(roadCells);
             //int x = gen.nextInt();
+
+
+           
+
             if(request.type == request.type.RESIDENCE) {
                 
                 Set<Cell> markedForConstruction = new HashSet<Cell>();
@@ -282,6 +316,11 @@ public class Player implements pentos.sim.Player {
                 Set<Cell> best_park = new HashSet<Cell>();
                 int best_perimeter = 100;
                 int best_size = 100;
+
+                
+
+
+
                 for(int i = 0; i < ITERATION_COUNT; ++i) {
                     int perimeter = 0;
                     int size = 0;
@@ -359,6 +398,17 @@ public class Player implements pentos.sim.Player {
         }
     }
     
+    private Set<Cell> getNeighbors(Set<Cell> b, Land land){
+        Set<Cell> res = new HashSet<Cell>();
+        for(Cell building_cell:b){
+            for(Cell n:building_cell.neighbors()){
+                if(b.contains(n)) continue;
+                res.add(n);
+            }
+        }
+        return res;
+    }
+
     // build shortest sequence of road cells to connect to a set of cells b
     //List<Set<Cell>>
     private List<Set<Cell>> findShortestRoad(Set<Cell> b, Land land) {
