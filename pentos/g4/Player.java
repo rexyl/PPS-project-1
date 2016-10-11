@@ -20,6 +20,7 @@ public class Player implements pentos.sim.Player {
     private boolean[][] isDisconnected;
     private Set<Cell> road_cells = new HashSet<Cell>();
     static int count = 0;
+    private boolean stop = false;
     public void init() {
         isDisconnected = new boolean[side][side];
         //getParameters();
@@ -97,12 +98,6 @@ public class Player implements pentos.sim.Player {
                     }
                         
 
-                    
-
-
-
-
-
                     int perimeter = 0;
                     boolean first_resident_or_wp = true;
                     
@@ -135,14 +130,7 @@ public class Player implements pentos.sim.Player {
                         if(x.j == 0 || x.j == land.side - 1) perimeter+=residence_to[4];
                     }
                     
-
-                    Set<Cell> neighbors_one = new HashSet<Cell>(shiftedCells);
-                    neighbors_one.addAll(getNeighbors(shiftedCells,land));
-                    Set<Cell> neighbors_two = getNeighbors(neighbors_one,land);
-                    for(Cell n:neighbors_two){
-                        if(land.getCellType(n.i,n.j) == Cell.Type.FACTORY) perimeter -= 10;
-                    }
-
+                    
                     // builda road to connect this building to perimeter
                     
                     if(!disconnected && ((perimeter > best_perimeter)
@@ -209,9 +197,6 @@ public class Player implements pentos.sim.Player {
                             if (t == Cell.Type.ROAD) {
                                 perimeter+=factory_to[6];
                             }
-                            // if (land.land[y.i][y.j].isResidence()) {
-                            //  perimeter+=2;
-                            // }
                             // if (land.land[y.i][y.j].isWater()) {
                             //  perimeter+=2;
                             // }
@@ -259,6 +244,7 @@ public class Player implements pentos.sim.Player {
         Move best_move = getBestMove(request, land);
         if (best_move == null) {
             //`m.out.println("no moves");
+            stop = true;
             return new Move(false);
         }
         // get coordinates of building placement (position plus local building cell coordinates)
@@ -307,17 +293,12 @@ public class Player implements pentos.sim.Player {
 
            
 
-            if(request.type == request.type.RESIDENCE) {
-                
+            if(request.type == request.type.RESIDENCE) {        
                 Set<Cell> markedForConstruction = new HashSet<Cell>();
                 markedForConstruction.addAll(roadCells);
                 Set<Cell> best_park = new HashSet<Cell>();
                 int best_perimeter = 100;
                 int best_size = 100;
-
-                
-
-
 
                 for(int i = 0; i < ITERATION_COUNT; ++i) {
                     int perimeter = 0;
@@ -389,9 +370,14 @@ public class Player implements pentos.sim.Player {
                 best_move.water = best_park;
                 prev_water = best_move.water;
             }
+            if(stop){
+                best_move.water = new HashSet<Cell>();
+                best_move.park = new HashSet<Cell>();
+            }
             return best_move;
         }
         else {
+            stop = true;
             return new Move(false);    
         }
     }
