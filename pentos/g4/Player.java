@@ -212,12 +212,14 @@ public class Player implements pentos.sim.Player {
                         if(x.j == 0 || x.j == land.side - 1) perimeter+=factory_to[4];                      
                     }
 
+                    /*
                     Set<Cell> neighbors_one = new HashSet<Cell>(shiftedCells);
                     neighbors_one.addAll(getNeighbors(shiftedCells,land));
                     Set<Cell> neighbors_two = getNeighbors(neighbors_one,land);
                     for(Cell n:neighbors_two){
                         if(land.getCellType(n.i,n.j) == Cell.Type.RESIDENCE) perimeter -= 10;
                     }
+                    */
                     
                     // builda road to connect this building to perimeter
                     if(!disconnected && (perimeter > best_perimeter 
