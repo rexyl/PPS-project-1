@@ -10,10 +10,10 @@ import pentos.sim.Move;
 
 public class Player implements pentos.sim.Player {
      //                        empty residence factory p/w side  road  firstroad  first_factory      divide100
-    private int[] factory_to = {0,   0,       2,      0,   2,    2,         0,       0,                 300};
+    private int[] factory_to = {0,   0,       1,      0,   0,    2,         0,       5,                 300};
     //                        empty residence factory p/w side  road  firstroad  firstpark/first water divide
-    private int[] residence_to = {0,    2,      0,      2,   1,    1,         0,                 0,      500};
-    private int[] waterpark_to = {0,   2,        2,     2,   0,   0};
+    private int[] residence_to = {0,    2,      0,      2,   0,    1,         0,                 5,      500};
+    private int[] waterpark_to = {0,    2,       2,     2,   0,   0};
     private Random gen = new Random();
     final int ITERATION_COUNT = 200;
     final int side = 50;
@@ -133,7 +133,7 @@ public class Player implements pentos.sim.Player {
                         
 
                     int perimeter = 0;
-                    perimeter += (50-i)*100/residence_to[8];
+                    //perimeter += (50-i+50-j)*100/residence_to[8];
                     boolean first_resident_or_wp = true;
                     
                     for(Cell x : shiftedCells) {
@@ -154,7 +154,7 @@ public class Player implements pentos.sim.Player {
                             if (t == Cell.Type.WATER || t == Cell.Type.PARK) {
                                 perimeter+=residence_to[3];
                             }
-                            if(first_resident_or_wp && (t == Cell.Type.WATER || t == Cell.Type.PARK || t == Cell.Type.RESIDENCE) ){
+                            if(first_resident_or_wp && (t == Cell.Type.WATER || t == Cell.Type.PARK || t == Cell.Type.RESIDENCE )){
                                 if (first_resident_or_wp) {
                                     first_resident_or_wp= false;
                                     perimeter+=residence_to[7];
@@ -216,7 +216,7 @@ public class Player implements pentos.sim.Player {
                     int perimeter = 0;
                     boolean first_factory = true;
 
-                    perimeter += i*100/factory_to[8];
+                    //perimeter += (i+j)*100/factory_to[8];
 
                     for(Cell x : shiftedCells) {
                         for(Cell y : x.neighbors()) {
