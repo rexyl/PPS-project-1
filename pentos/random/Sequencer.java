@@ -41,10 +41,10 @@ public class Sequencer implements pentos.sim.Sequencer {
 
     private Building randomFactory() { // random rectangle with side length between 2 and 5 inclusive
 	Set<Cell> factory = new HashSet<Cell>();
-	int width = gen.nextInt(3);
-	int height = gen.nextInt(3);
-	for (int i=0; i<width+2; i++) {
-	    for (int j=0; j<height+2; j++) {
+	int width = gen.nextInt(5);
+	int height = gen.nextInt(5);
+	for (int i=0; i<width+1; i++) {
+	    for (int j=0; j<height+1; j++) {
 		factory.add(new Cell(i,j));
 	    }
 	}
