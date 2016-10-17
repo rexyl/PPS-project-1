@@ -9,11 +9,12 @@ import pentos.sim.Land;
 import pentos.sim.Move;
 
 public class Player implements pentos.sim.Player {
+                            
      //                        empty residence factory p/w side  road  firstroad  first_factory      divide100
-    private int[] factory_to = {0,   0,       1,      0,   0,    2,         0,       5,                 300};
-    //                        empty residence factory p/w side  road  firstroad  firstpark/first water divide
-    private int[] residence_to = {0,    2,      0,      2,   0,    1,         0,                 5,      500};
-    private int[] waterpark_to = {0,    2,       2,     2,   0,   0};
+    private int[] factory_to = {0,   0,       1,      0,   1,    1,         1,       3,                300};
+    //                        empty residence factory p/w  side  road  firstroad  firstpark/first water divide
+    private int[] residence_to = {0,    4,      0,      4,  2,    3,         0,                 7,      500};
+    private int[] waterpark_to = {-3,    0,       3,     -1,   -1,   -4};
     private Random gen = new Random();
     final int ITERATION_COUNT = 200;
     final int side = 50;
@@ -24,6 +25,10 @@ public class Player implements pentos.sim.Player {
     public void init() {
         isDisconnected = new boolean[side][side];
         //getParameters();
+        // for (int tmp :factory_to ) {
+        //     System.out.print(tmp);
+        //     System.out.print(" ");
+        // }
     }
 
     public void getParameters(){
@@ -58,40 +63,6 @@ public class Player implements pentos.sim.Player {
             // Or we could just do this: 
             // ex.printStackTrace();
         }
-    }
-
-
-
-    private int countBlob(Set<Cell> shiftedCells, Set<Cell> added_Cells, Land land){
-        boolean[][] occupied = new boolean[land.side][land.side];
-        for(Cell s:shiftedCells) occupied[s.i][s.j] = true;
-        Set<Cell> neighbors = getNeighbors(added_Cells,land);
-        //System.out.println(neighbors.size());
-        int result = 0;
-        for(Cell n:neighbors){
-            if(occupied[n.i][n.j]) continue;
-            Set<Cell> start = new HashSet<Cell>();
-            start.add(n);
-            List<Set<Cell>> roadCells_list = findShortestRoad(start, land, shiftedCells);
-            if(roadCells_list == null){
-                //BFS to find largest connected blob
-                Stack<Cell> stack = new Stack<Cell>();
-                stack.push(n);
-                while(stack.size() != 0){
-                    Cell curr = stack.pop();
-                    occupied[curr.i][curr.j] = true;
-                    result++;
-                    for(Cell child:curr.neighbors()){
-                        if(!occupied[child.i][child.j]) stack.push(child);
-                    }
-                }
-            }
-            else{
-                occupied[n.i][n.j] = true;
-            }
-        }
-        if(result != 0) System.out.println("result: " + result);
-        return 100000000*result;
     }
 
     public Move getBestMove(Building request, Land land) {
@@ -133,8 +104,7 @@ public class Player implements pentos.sim.Player {
                         
 
                     int perimeter = 0;
-                    //perimeter += (50-i+50-j)*100/residence_to[8];
-                    boolean first_resident_or_wp = true;
+                    boolean first_resident_or_wp = true, first_road = true;
                     
                     for(Cell x : shiftedCells) {
                         for(Cell y : x.neighbors()) {
@@ -145,33 +115,53 @@ public class Player implements pentos.sim.Player {
                             //  perimeter+=2;
                             // }
                             Cell.Type t = land.getCellType(y.i,y.j);
+                            if (t == Cell.Type.EMPTY) {
+                                perimeter+=residence_to[0];
+                            }
                             if (t == Cell.Type.ROAD) {
                                 perimeter+=residence_to[5];
+                                if(first_road) {
+                                    perimeter += residence_to[6];
+                                    first_road = false;
+                                }
                             }
                             if (t == Cell.Type.RESIDENCE) {
-                                perimeter+=residence_to[2];
+                                perimeter+=residence_to[1];
                             }
                             if (t == Cell.Type.WATER || t == Cell.Type.PARK) {
                                 perimeter+=residence_to[3];
                             }
-                            if(first_resident_or_wp && (t == Cell.Type.WATER || t == Cell.Type.PARK || t == Cell.Type.RESIDENCE )){
+                            if(first_resident_or_wp && (t == Cell.Type.WATER || t == Cell.Type.PARK || t == Cell.Type.RESIDENCE) ){
                                 if (first_resident_or_wp) {
                                     first_resident_or_wp= false;
                                     perimeter+=residence_to[7];
                                 }
                             }
                         }
-                        if(x.i == 0 || x.i == land.side - 1) perimeter+=residence_to[4];
-                        if(x.j == 0 || x.j == land.side - 1) perimeter+=residence_to[4];
+                        if(x.i == 0 || x.i == land.side - 1) {
+                            perimeter+=residence_to[4];
+                            if(first_road) {
+                                perimeter += residence_to[6];
+                                first_road = false;
+                            }
+                            
+                        }
+                        if(x.j == 0 || x.j == land.side - 1) {
+                            perimeter+=residence_to[4];
+                            if(first_road) {
+                                perimeter += residence_to[6];
+                                first_road = false;
+                            }
+                        }
                     }
                     
                     
-                    perimeter -= countBlob(new HashSet<Cell>(),shiftedCells,land);
                     // builda road to connect this building to perimeter
+                    
                     if(!disconnected && ((perimeter > best_perimeter)
                             ||(perimeter==best_perimeter && (i  + j) < best_i +  best_j)
                             || (perimeter==best_perimeter && (i  + j) ==  best_i + best_j) && Math.abs(i-j) < Math.abs(best_i - best_j))) {
-                        List<Set<Cell>> roadCells_list = findShortestRoad(shiftedCells, land, new HashSet<Cell>());
+                        List<Set<Cell>> roadCells_list = findShortestRoad(shiftedCells, land);
                         if(roadCells_list != null) {
                             best_move = temp;
                             best_i = i;
@@ -215,15 +205,16 @@ public class Player implements pentos.sim.Player {
                     
                     int perimeter = 0;
                     boolean first_factory = true;
-
-                    //perimeter += (i+j)*100/factory_to[8];
-
+                    
                     for(Cell x : shiftedCells) {
                         for(Cell y : x.neighbors()) {
                             if (shiftedCells.contains(y)) {
                                 continue;
                             }
                             Cell.Type t = land.getCellType(y.i,y.j);
+                            if (t == Cell.Type.EMPTY) {
+                                perimeter+=factory_to[0];
+                            }
                             if (t == Cell.Type.FACTORY) {
                                 perimeter+=factory_to[2];
                                 if(first_factory){
@@ -246,20 +237,18 @@ public class Player implements pentos.sim.Player {
                         if(x.j == 0 || x.j == land.side - 1) perimeter+=factory_to[4];                      
                     }
 
-                    /*
                     Set<Cell> neighbors_one = new HashSet<Cell>(shiftedCells);
                     neighbors_one.addAll(getNeighbors(shiftedCells,land));
                     Set<Cell> neighbors_two = getNeighbors(neighbors_one,land);
                     for(Cell n:neighbors_two){
                         if(land.getCellType(n.i,n.j) == Cell.Type.RESIDENCE) perimeter -= 10;
                     }
-                    */
-                    perimeter -= countBlob(new HashSet<Cell>(),shiftedCells,land);
+                    
                     // builda road to connect this building to perimeter
                     if(!disconnected && (perimeter > best_perimeter 
                             || (perimeter==best_perimeter && (i  + j) >  best_i + best_j))
                             ||(perimeter==best_perimeter && (i  + j) ==  best_i + best_j) && Math.abs(i-j) < Math.abs(best_i - best_j)) {
-                        List<Set<Cell>> roadCells_list = findShortestRoad(shiftedCells, land, new HashSet<Cell>());
+                        List<Set<Cell>> roadCells_list = findShortestRoad(shiftedCells, land);
                         if(roadCells_list != null) {
                             best_move = temp;
                             best_i = i;
@@ -286,7 +275,6 @@ public class Player implements pentos.sim.Player {
             stop = true;
             return new Move(false);
         }
-        System.out.println(request.toString());
         // get coordinates of building placement (position plus local building cell coordinates)
         Set<Cell> shiftedCells = new HashSet<Cell>();
         for (Cell x : best_move.request.rotations()[best_move.rotation]) {
@@ -296,7 +284,7 @@ public class Player implements pentos.sim.Player {
             //System.out.println(x.i + " " + x.j + " shifted to " + (x.i+best_move.location.i) + " " + (x.j + best_move.location.j));
         }
         // builda road to connect this building to perimeter
-        List<Set<Cell>> roadCells_list = findShortestRoad(shiftedCells, land, new HashSet<Cell>());
+        List<Set<Cell>> roadCells_list = findShortestRoad(shiftedCells, land);
         if (roadCells_list != null) {
             int best_perimeter_road = Integer.MIN_VALUE;
             Set<Cell> roadCells = new HashSet<Cell>();
@@ -309,6 +297,7 @@ public class Player implements pentos.sim.Player {
                         // if (t == Cell.Type.FACTORY) {
                         //     perimeter+=2;
                         // }
+
                         if (t == Cell.Type.ROAD) {
                             perimeter+=200;
                         }
@@ -344,7 +333,6 @@ public class Player implements pentos.sim.Player {
                     int perimeter = 0;
                     int size = 0;
                     Set<Cell> park_option = randomWalk(shiftedCells, markedForConstruction, land, 4, 1);
-                    perimeter -= countBlob(markedForConstruction,park_option,land);
                     size = park_option.size()>0?park_option.size():110;
                     for(Cell x : park_option) {
                         for(Cell y: x.neighbors()) {
@@ -356,6 +344,9 @@ public class Player implements pentos.sim.Player {
                             // if (land.land[y.i][y.j].isRoad()) {
                             //  perimeter+=2;
                             // }
+                            if (t == Cell.Type.EMPTY) {
+                                perimeter+=waterpark_to[0];
+                            }
                             if (t == Cell.Type.RESIDENCE) {
                                 perimeter+=waterpark_to[1];
                             }
@@ -383,11 +374,13 @@ public class Player implements pentos.sim.Player {
                     int size = 0;
                     Set<Cell> park_option = randomWalk(shiftedCells, markedForConstruction, land, 4, 2);
                     size = park_option.size()>0?park_option.size():110;
-                    perimeter -= countBlob(markedForConstruction,park_option,land);
                     for(Cell x : park_option) {
                         for(Cell y: x.neighbors()) {
                             if (park_option.contains(y)) continue;
                             Cell.Type t = land.getCellType(y.i,y.j);
+                            if (t == Cell.Type.EMPTY) {
+                                perimeter+=waterpark_to[0];
+                            }
                             if (t == Cell.Type.FACTORY) {
                                 perimeter+=waterpark_to[2];
                             }
@@ -437,7 +430,7 @@ public class Player implements pentos.sim.Player {
 
     // build shortest sequence of road cells to connect to a set of cells b
     //List<Set<Cell>>
-    private List<Set<Cell>> findShortestRoad(Set<Cell> b, Land land, Set<Cell> markedForConstruction) {
+    private List<Set<Cell>> findShortestRoad(Set<Cell> b, Land land) {
         List<Set<Cell>> res = new ArrayList<Set<Cell>>();
         boolean[][] checked = new boolean[land.side][land.side];
         Queue<Cell> queue = new LinkedList<Cell>();
@@ -457,19 +450,19 @@ public class Player implements pentos.sim.Player {
             if (b.contains(new Cell(0,z)) || b.contains(new Cell(z,0)) || b.contains(new Cell(land.side-1,z)) || b.contains(new Cell(z,land.side-1))) //if already on border don't build any roads
             //return output;
             return res;
-            if (land.unoccupied(0,z) && !markedForConstruction.contains(new Cell(0,z)))
+            if (land.unoccupied(0,z))
             queue.add(new Cell(0,z,source));
-            if (land.unoccupied(z,0) && !markedForConstruction.contains(new Cell(z,0)))
+            if (land.unoccupied(z,0))
             queue.add(new Cell(z,0,source));
-            if (land.unoccupied(z,land.side-1) && !markedForConstruction.contains(new Cell(z,land.side-1)))
+            if (land.unoccupied(z,land.side-1))
             queue.add(new Cell(z,land.side-1,source));
-            if (land.unoccupied(land.side-1,z) && !markedForConstruction.contains(new Cell(land.side-1,z)) )
+            if (land.unoccupied(land.side-1,z))
             queue.add(new Cell(land.side-1,z,source));
         }
         // add cells adjacent to current road cells
         for (Cell p : road_cells) {
             for (Cell q : p.neighbors()) {
-            if (!road_cells.contains(q) && land.unoccupied(q) && !markedForConstruction.contains(q) && !b.contains(q)) 
+            if (!road_cells.contains(q) && land.unoccupied(q) && !b.contains(q)) 
                 queue.add(new Cell(q.i,q.j,p)); // use tail field of cell to keep track of previous road cell during the search
             }
         }   
@@ -496,7 +489,7 @@ public class Player implements pentos.sim.Player {
                         if_break = true;
                     }
                 }
-                else if (!checked[x.i][x.j] && land.unoccupied(x.i,x.j) &&!markedForConstruction.contains(x)) {
+                else if (!checked[x.i][x.j] && land.unoccupied(x.i,x.j)) {
                     x.previous = p;
                     checked[x.i][x.j] = true;
                     queue.add(x);
